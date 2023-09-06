@@ -16,8 +16,9 @@ import matplotlib.pyplot as plt
 from tqdm import tqdm
 import os
 
-RESCALE_FIRST = False
-PARALLEL_PRO = False
+RESCALE_FIRST = True
+PARALLEL_PRO = True
+DEBUG = True
 def create_colored_image(filename: str, crop_percent: float, preprocess_func = lambda x: x, lvls = 0, debug = False) -> np.array:
     img = skio.imread(filename)
     im = sk.img_as_float(img)
@@ -31,23 +32,28 @@ def create_colored_image(filename: str, crop_percent: float, preprocess_func = l
     
     #preprocess images to edge cased pictures
     ##border crop
-    hcrop: int = int(height * (crop_percent / 100))
-    wcrop: int = int(width * (crop_percent / 100))
-    bc = b[hcrop : height - hcrop, wcrop : width - wcrop]
-    gc = g[hcrop : height - hcrop, wcrop : width - wcrop]
-    rc = r[hcrop : height - hcrop, wcrop : width - wcrop]
     if debug:
+        hcrop: int = int(height * (crop_percent / 100))
+        wcrop: int = int(width * (crop_percent / 100))
+        bc = b[hcrop : height - hcrop, wcrop : width - wcrop]
+        gc = g[hcrop : height - hcrop, wcrop : width - wcrop]
+        rc = r[hcrop : height - hcrop, wcrop : width - wcrop]
+        
+    
         f, ax = plt.subplots(2, 2)
         ax[0, 0].imshow(rc)
         ax[0, 1].imshow(gc)
         ax[1, 0].imshow(bc)
         ax[1, 1].imshow(rc + gc + bc)
         plt.show()
+    bc = b
+    gc = g
+    rc = r
     
     #process image
-    bp = preprocess_func(bc)
-    gp = preprocess_func(gc)
-    rp = preprocess_func(rc)
+    bp = preprocess_func(bc).astype(np.float64)
+    gp = preprocess_func(gc).astype(np.float64)
+    rp = preprocess_func(rc).astype(np.float64)
     
     if debug:
         f, ax = plt.subplots(2, 2)
@@ -57,7 +63,7 @@ def create_colored_image(filename: str, crop_percent: float, preprocess_func = l
         ax[1, 1].imshow(rp + gp + bp)
     
     #calculate best translations
-    best_trans = pyramidgauss(rp, gp, bp, lvls=lvls)
+    best_trans = pyramidgauss(rp, gp, bp, crop_percent, lvls=lvls)
     best_r_trans = best_trans[0]
     best_g_trans = best_trans[1]
     
@@ -80,7 +86,7 @@ def create_colored_image(filename: str, crop_percent: float, preprocess_func = l
     
      ##align the images
      
-def pyramidgauss(r: np.array, g: np.array, b: np.array, lvls=0) -> list[list[int]]:
+def pyramidgauss(r: np.array, g: np.array, b: np.array, crop_percent = 0, lvls=0) -> list[list[int]]:
     """This function uses the idea of pyramid scaling to find translation on 
     the smallest coursest version of image which makes the search time very small.
     Once building back up to true size, only need to search with displacement range of
@@ -99,7 +105,7 @@ def pyramidgauss(r: np.array, g: np.array, b: np.array, lvls=0) -> list[list[int
     width = r.shape[1]
     
     #set max pixel displacement to search for, empirical value
-    displacement = 30
+    displacement = 15
     
     best_r_trans = [0, 0]
     best_g_trans = [0, 0]
@@ -169,6 +175,7 @@ def pyramidgauss(r: np.array, g: np.array, b: np.array, lvls=0) -> list[list[int
         #     scaled_b = resize(b, next_size, anti_aliasing=False)
         #     scaled_g = resize(g, next_size, anti_aliasing=False)
         #original size
+        
         if RESCALE_FIRST:
             p_rgb = next_size
             scaled_r = p_rgb[0]
@@ -184,14 +191,28 @@ def pyramidgauss(r: np.array, g: np.array, b: np.array, lvls=0) -> list[list[int
             scaled_r = resize(r, next_size, anti_aliasing=False)
             scaled_b = resize(b, next_size, anti_aliasing=False)
             scaled_g = resize(g, next_size, anti_aliasing=False)
+            
+        height = scaled_r.shape[0]
+        width = scaled_r.shape[1]
+        #crop border each time in pyramid now
+        hcrop: int = int(height * (crop_percent / 100))
+        wcrop: int = int(width * (crop_percent / 100))
+        scaled_r = scaled_r[hcrop : height - hcrop, wcrop : width - wcrop]
+        scaled_b = scaled_b[hcrop : height - hcrop, wcrop : width - wcrop]
+        scaled_g = scaled_g[hcrop : height - hcrop, wcrop : width - wcrop]
+        
+        if displacement == 15:
+            displacement = scaled_b.shape[0] // 15 if scaled_b.shape[0] > scaled_b.shape[1] else scaled_b.shape[1] // 15
         if PARALLEL_PRO:
-            best_r_trans = parallel_align(scaled_r, scaled_b, displacement, best_r_trans)
-            best_g_trans = parallel_align(scaled_g, scaled_b, displacement, best_g_trans)
+            prev_r = best_r_trans
+            prev_g = best_g_trans
+            best_r_trans = parallel_align(scaled_r, scaled_b, displacement, [2 * i for i in best_r_trans])
+            best_g_trans = parallel_align(scaled_g, scaled_b, displacement, [2 * i for i in best_g_trans])
         else:
             prev_r = best_r_trans
             prev_g = best_g_trans
-            best_r_trans = simple_align(scaled_r, scaled_b, displacement, best_r_trans)
-            best_g_trans = simple_align(scaled_g, scaled_b, displacement, best_g_trans)
+            best_r_trans = simple_align(scaled_r, scaled_b, displacement, [2 * i for i in best_r_trans])
+            best_g_trans = simple_align(scaled_g, scaled_b, displacement, [2 * i for i in best_g_trans])
         displacement = 2
     return [best_r_trans, best_g_trans]
         
@@ -215,7 +236,7 @@ def simple_align(im_1, im_2, displacement: int, start_trans: list[int] = [0, 0])
     Args:
         im_1 (np.array): 2D numpy array w/ first image as base
         im_2 (np.array): 2D numpy array w/ second image comparing to base
-        displacement (int): number of pixel displacements to search up until
+        displacement (int): number of pixel displacements to search up until 
     
     Returns:
         list[int]: best translation to move im_2 to im_1
@@ -260,7 +281,7 @@ def parallel_align(im_1, im_2, displacement: int, start_trans: list[int] = [0, 0
         vec1 = shift2(im_1, (start_trans[0] + dx, start_trans[1] + dy)).flatten()
         ncc_val = ncc(vec1, vec2)
         
-        return ncc_val, [start_trans[0] + diff_x, start_trans[1] + diff_y]
+        return ncc_val, [start_trans[0] + dx, start_trans[1] + dy]
     # base_avg = np.mean(im_2)
     # comp_avg = np.mean(im_1)
     # vec1 = im_1.flatten()
@@ -276,6 +297,9 @@ def parallel_align(im_1, im_2, displacement: int, start_trans: list[int] = [0, 0
 
         for result in tqdm(results, "Aligning w/ max displacement: {}".format(displacement)):
             ncc_val, trans = result.result()
+            # if ncc_val > max_val or (np.isclose(ncc_val, max_val) 
+            #                          and (abs(trans[0]) > abs(best_trans[0])
+            #                               or (abs(trans[1])) > abs(best_trans[1]))):
             if ncc_val > max_val:
                 best_trans[0] = trans[0]
                 best_trans[1] = trans[1]
@@ -317,7 +341,7 @@ def apply_gaussian_blur(img: np.array) -> np.array:
     return result
         
 def ssd(vec1, vec2):
-    return np.sum((vec1 - vec2) ** 2)
+    return -np.sum((vec1 - vec2) ** 2)
 
 def ncc(vec1, vec2):
     """Compute Normalized Cross-Correlation between two vectors
@@ -345,17 +369,17 @@ def main():
     imname = 'monastery.jpg'
     imname = input("name of file: ")
     lvls = int(input("How many levels for pyramid? 1=no pyramid, 0=automatic division by 2 until img less that 100 x 100 pixels: "))
-    CROP_PERCENT = 10
-    FUNC_METHOD = "edge"
+    CROP_PERCENT = 12.5
+    FUNC_METHOD = "edge and color"
     img_path = os.path.join(data, imname)
-    #use skleans uncanny
-    img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda img: feature.canny(img, sigma=3), lvls=lvls, debug=True)
+    # use skleans uncanny
+    img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda img: feature.canny(img, sigma=6), lvls=lvls, debug=DEBUG)
     #hand crafted uncanny or gaussian blur subtraction:look in function
-    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, get_edge_image, lvls=lvls, debug=True)
+    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, get_edge_image, lvls=lvls, debug=DEBUG)
     # color based aligning
-    # img, non_trans = create_colored_image(img_path, 15, lambda x: x, debug = True)
+    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda x: x, debug = DEBUG)
     #canny filter plus img color to add more weight to edges but also look for color similarity
-    # img, non_trans = create_colored_image(img_path, CROP_PERCENT, edge_and_color, lvls=lvls, debug=True)
+    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, edge_and_color, lvls=lvls, debug=DEBUG)
     # save the image
     copies = 0
     

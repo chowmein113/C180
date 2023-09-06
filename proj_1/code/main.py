@@ -111,12 +111,14 @@ def pyramidgauss(r: np.array, g: np.array, b: np.array, lvls=0) -> list[list[int
             while height > 100 and width > 100:
                 height //= 2
                 width //= 2
+                
                 queue.append([height, width])
         elif lvls > 1:
             for lvl in range(0, lvls):
                 height //= 2
                 width //= 2
                 queue.append([height, width])
+        displacement = (width // 15)
         
         
     else:

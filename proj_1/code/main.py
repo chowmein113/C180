@@ -58,10 +58,14 @@ def create_colored_image(filename: str, crop_percent: float, preprocess_func = l
     if debug:
         f, ax = plt.subplots(2, 2)
         ax[0, 0].imshow(rp)
+        ax[0, 0].set_title('red channel processed')
         ax[0, 1].imshow(gp)
+        ax[0, 1].set_title('green channel processed')
         ax[1, 0].imshow(bp)
+        ax[1, 0].set_title('blue channel processed')
+        ax[1, 1].set_title('combined channel processed')
         ax[1, 1].imshow(rp + gp + bp)
-    
+        plt.show()
     #calculate best translations
     best_trans = pyramidgauss(rp, gp, bp, crop_percent, lvls=lvls)
     best_r_trans = best_trans[0]
@@ -369,44 +373,45 @@ def main():
     imname = 'monastery.jpg'
     imname = input("name of file: ")
     lvls = int(input("How many levels for pyramid? 1=no pyramid, 0=automatic division by 2 until img less that 100 x 100 pixels: "))
-    CROP_PERCENT = 12.5
-    FUNC_METHOD = "edge and color"
+    CROP_PERCENT = 5
+    FUNC_METHOD = "color"
     img_path = os.path.join(data, imname)
-    # use skleans uncanny
-    img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda img: feature.canny(img, sigma=6), lvls=lvls, debug=DEBUG)
-    #hand crafted uncanny or gaussian blur subtraction:look in function
+    
+    # use skleans canny edge method
+    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda img: feature.canny(img, sigma=3), lvls=lvls, debug=DEBUG)
+    
+    #hand crafted uncanny or gaussian blur subtraction:look in function provided
     # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, get_edge_image, lvls=lvls, debug=DEBUG)
+    
     # color based aligning
     # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, lambda x: x, debug = DEBUG)
+    
     #canny filter plus img color to add more weight to edges but also look for color similarity
-    # img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, edge_and_color, lvls=lvls, debug=DEBUG)
+    img, non_trans, best_r_trans, best_g_trans = create_colored_image(img_path, CROP_PERCENT, edge_and_color, lvls=lvls, debug=DEBUG)
+    
     # save the image
     copies = 0
     
     fname = 'out_aligned_{}_crop_{}_method_{}_red_x_{}_y_{}_green_x_{}_y_{}_{}'.format(copies, CROP_PERCENT, FUNC_METHOD, best_r_trans[0], best_r_trans[1], best_g_trans[0], best_g_trans[1], imname)
     faname = 'out_not_aligned_{}_crop_{}_method_{}_red_x_{}_y_{}_green_x_{}_y_{}_{}'.format(copies, CROP_PERCENT, FUNC_METHOD, best_r_trans[0], best_r_trans[1], best_g_trans[0], best_g_trans[1], imname)
     
-    fname = os.path.join(root, 'images', fname)
-    faname = os.path.join(root, 'images', faname)
+    fname = os.path.join(root, 'images', 'aligned', fname)
+    faname = os.path.join(root, 'images', 'not_aligned', faname)
     while (os.path.exists(faname)):
         copies += 1
         fname = 'out_aligned_{}_crop_{}_method_{}_red_x_{}_y_{}_green_x_{}_y_{}_{}'.format(copies, CROP_PERCENT, FUNC_METHOD, best_r_trans[0], best_r_trans[1], best_g_trans[0], best_g_trans[1], imname)
         faname = 'out_not_aligned_{}_crop_{}_method_{}_red_x_{}_y_{}_green_x_{}_y_{}_{}'.format(copies, CROP_PERCENT, FUNC_METHOD, best_r_trans[0], best_r_trans[1], best_g_trans[0], best_g_trans[1], imname)
-        fname = os.path.join(root, 'images', fname)
-        faname = os.path.join(root, 'images', faname)
+        fname = os.path.join(root, 'images', 'aligned', fname)
+        faname = os.path.join(root, 'images', 'not_aligned',  faname)
     
     # display the image
     f, axs = plt.subplots(2, 1)
     axs[0].imshow(img)
-    axs[0].set_title("combined img")
+    axs[0].set_title("{} method for combined img w/ red x displacement: {} and red y displacement: {} and green x displacement: {} and green y displacement: {}".format(FUNC_METHOD, best_r_trans[0], best_r_trans[1], best_g_trans[0], best_g_trans[1]))
     axs[1].imshow(non_trans)
     axs[1].set_title("placed on top of each other (no alignment)")
+    f.tight_layout()
     plt.show()
-    
-    skio.imsave(fname, img)
-    skio.imsave(faname, non_trans)
-
-    # display the image
 
     return
 if __name__ == '__main__':

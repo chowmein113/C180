@@ -1,0 +1,109 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>CS 180 Project 1</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+</style>
+</head>
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<title>Page Title</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+</head>
+<body>
+
+<h1>Project 1 by Kevin Chow</h1>
+<p>Given a list of negative glass plate images from the Prokudin-Gorskii collection, the goal of this project is to take each filtered channel; r, g, and b, 
+    and use them to recreate a colored image. The project problems I solved were the alignment process. Each negative does not inherently match up to the other negatives, so when the negatives
+    so when combining them they dont look perfectly colored and have a 3D looking offset. Using a search window with a specified max pixel displacement, I found the best alignment using a edge detecting preprocessing 
+    technique and using Normalized Cross-Correlation to find the best transition to move a red or gree channel along the base template blue channel. I sped up the process using parallel computing using multithreading. in larger ncc computations,
+    I sped up the computing process by about half the time it would take linearly because each ncc value computation doesnt rely on the previous value and can be run in parallel. The preprocessing algorithm
+    I ended up choosing is the use of canny edge detection, gaussian blur edge detection, and a combination of canny edge detection with color intensity.
+</p>
+<h1>The Algorithm</h1>
+<p>The algorithms I used were better for different images and I'll explain each one below.</p>
+<h2>Canny Edge Detection</h2><br/>
+<h3>Train Channels</h3>
+<img src="images/train_channels.png" alt="Train Channels"/>
+<h3>Train Edges Canny</h3>
+<img src="images/train_canny_edge.png" alt="Train Canny Edge Processed"/>
+<h3>Train Comparison</h3>
+<img src="images/train_compare_canny_edge.png" alt="Train Channels"/>
+<p>The Canny Edge detection uses skimage canny feature, where it takes a gaussian kernel based on a specified sigma value, and smoothes out the greyscaled image. It then uses threshold values to either assign it a 0 signal, a 0.5 signal, if not sure, and 1 signal for hard edge. I use this with NCC to find the best alignment along with the pyramid scheme</p>
+<h2>Edge and Color</h2>
+<h3>Three generation channels</h3>
+<img src="images/three_generation_no_edge_and_color.png" alt="Train Channels"/>
+<h3>Three generations Edges Canny and Color</h3>
+<img src="images/three_generation_color_and_edge.png" alt="Train Canny Edge Processed"/>
+<h3>Three Generation Comparison</h3>
+<img src="images/three_generation_compare.png" alt="Train Channels"/>
+<p>This technique take the edge detection result of applying the canny edge detection technique with the gaussian blur box filter method and adds it on top of the channel values. This essentially adds on more weight to edges while not completely forgettting about the color data to prevent data loss when comparing just edges. This is intended to make NCC favor edge alignment but also take color intensity matching into account. 
+    So the algorithm looks like this: processed_channel(channel) = canny(channel) + channel
+
+</p>
+<h2>Canny Edge with color vs just Canny</h2>
+<img src="images/icon_canny.png" alt="Train Channels"/>
+<img src="images/icon_edge_and_color.png" alt="Train Channels"/>
+<h2> Normalized Cross-Correlation</h2>
+<p>The algorithm for Normalized Cross-Correlation takes two channels, the shifted frame and the base frame. We take one channel and slide it over a max displacement range of 1/15th the pixel range on the base frame to find the best match. Each time, we run NCC which take the shifted frame(the shifted frame uses zero pad shifting for when numbers are out of bounds for shifted window) as a vector and the
+    base frame as a vector. We center each vector with its mean, and normalize it and make it a unit vector by dividing the vector by its euclidean norm. We then use the dot product between those vectors to get a numerical value of how closely related the two vectors are. After finding each combination comparing the shifted frame with the base frame, we find the shift that makes the two frames/channels the most similar to make the best alignment for the images. </p>
+
+    <h2> The Pyramid Scheme</h2>
+    <p>When calculating the alignment for images, the larger the images are, the longer the computations take, exponentially. The algorithm we can use is the Pyramid Scaling Technique. We can keep flooring the image size by 2 until its in a small computable size and find the best alignment with the displacement of ~15 pixels max. Then we go up the pyramid levels where the image gets scaled back by two -> our translation from the previous level is multiplied by two and should be in
+        a pixel search range of 2 pixels max to account for error when scaling back and working our way back to the top with the original image scaling. This method saves a bunch of computation time, especially with multi-threading.
+
+    </p>
+    <h2>Cropping</h2>
+    <p>because borders along each channel are not part of the channel and show difference between the channels, it makes it hard to match and align, therefore it is ideal to automatically cut crop each frame on the pyramid level to get rid of "noise" from wear and tear and on the plates themselves. the cropiing varied but was usually around 10-15% cropped out</p>
+<h2>Problems</h2>
+    <p>Some problems I had was assuming that going up a level on the pyramid meant I keep the previous transition as is. I did not realize I had to scale the transitions by 2 as well and not just scaling the image up by 2. Another problem I had was witht he original color algorithm. Some alignments did not work just purely using the color algorithm likely because the filters were not pure Red, Green, and Blue, or channels were too different with intensity which affected the NCC calculations with less similarity and not aligning.
+        Some other problems I ran into was Canny edge or edge and color methods not always working, canny works well with very contrasty images and clear distinctions or borders between color and not a lot of noise. Color and edge didt work on emir because colors were too different and the weighted edges could not overcome the color difference. Overall, color and edge worked when pictures had light shadows or harsh soft lighting and canny edge worked well with hard shadows or hard light intensity differences
+    </p>
+    <h3>Results</h3>
+<p>for the rest of the images that were not shown i will list the results in this section</p>
+<h3>Cathedral olor_red_x displaced_11_red y displaced_3_green_x displaced_5_green y displaced_2_cathedral</h3>
+<img src="images/aligned/out_aligned_0_crop_12.5_method_edge and color_red_x_11_y_3_green_x_5_y_2_cathedral.jpg" alt="Train Channels"/>
+<h3>church</h3>
+<img src="images/church.png" alt="Train Channels"/>
+<br/>
+<h3>harvesters</h3>
+<img src="images/harvesters.png" alt="Train Channels"/>
+<h3>emir</h3>
+<img src="images/emir.png" alt="Train Channels"/>
+<h3>lady</h3>
+<img src="images/lady.png" alt="Train Channels"/>
+<h3>melons</h3>
+<img src="images/melons.png" alt="Train Channels"/>
+<h3>onion_church</h3>
+<img src="images/onion_church.png" alt="Train Channels"/>
+<h3>tobolsk color_red_x_6_y_3_green_x_2_y_2</h3>
+<img src="images/aligned/out_aligned_0_crop_12.5_method_edge and color_red_x_6_y_3_green_x_2_y_2_tobolsk.jpg" alt="Train Channels"/> 
+<h3>out_aligned_0_crop_10_method_edge_red_x_3_y_3_green_x_-3_y_2_monastery</h3>
+<img src="images/aligned/out_aligned_0_crop_10_method_edge_red_x_3_y_3_green_x_-3_y_2_monastery.jpg"/>
+<h1>Additional images found personally from the collection</h1>
+<h2>River</h2>
+<img src="images/river.png"/>
+<h2>Hut</h2>
+<img src="images/hut.png"/>
+<h2>Glass</h2>
+<img src="images/glass.png"/>
+<h1>Bells and Whistles</h1>
+<p>Instead of using the traditional color comparison algorithm for NCC, I instead opted for implementing the edge detection method alongside or instead of the color algorithm. This allowed me to align images that could not be aligned traditionally with the previous algorithm like emir.tif</p>
+<br/>
+<p>For example, here is emir.tif without edge detection and only color alignment algorithms:</p>
+<h2>Emir Just Color</h2>
+<img src="images/emir_just_color.png" alt="Train Channels"/>
+<h2>Emir with canny edge detection</h2>
+<img src="images/emir.png" alt="Train Channels"/>
+</body>
+</html>
+<body>
+
+
+
+</body>
+</html>

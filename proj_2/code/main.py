@@ -18,8 +18,8 @@ def finite_diff_op():
     Dx = np.array([[1, -1]])
     Dy = np.array([[1, -1]]).T
     parent_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
-    filename = osp.join(parent_dir,"images")
-    filename = osp.join(filename, "cameraman.png")
+    fileroot = osp.join(parent_dir,"images")
+    filename = osp.join(fileroot, "cameraman.png")
     img = skio.imread(filename)
     alpha = img[:,:,3]
     rgb = img[:,:,:3]
@@ -94,6 +94,27 @@ def finite_diff_op():
     plt.tight_layout()
     
     plt.show()
+    ### r = im[...,0]
+    filename = osp.join(fileroot, "taj.jpg")
+    img = skio.imread(filename)
+    r = img[:,:,0]
+    g = img[:, :, 1]
+    b = img[:, :, 2]
+    mag = 2
+    hpf_taj_r = mag * (r - convolve2d(r, g2d, mode='same', boundary='symm')) + r
+    hpf_taj_g = mag * (g - convolve2d(g, g2d, mode='same', boundary='symm')) + g
+    hpf_taj_b = mag * (b - convolve2d(b, g2d, mode='same', boundary='symm')) + b
+    
+    img[:, :, 0] = hpf_taj_r
+    img[:, :, 1] = hpf_taj_g
+    img[:, :, 2] = hpf_taj_b
+    
+    f, axs = plt.subplots(1,1)
+    axs.set_title("High Frequency Sharpen edges")
+    axs.imshow(img)
+    plt.tight_layout()
+    plt.show()
+        
 def main():
     finite_diff_op()
 

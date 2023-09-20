@@ -8,6 +8,7 @@ import skimage.transform as sktr
 
 def get_points(im1, im2):
     print('Please select 2 points in each image for alignment.')
+    plt.title('Please select 2 points in each image for alignment.')
     plt.imshow(im1)
     p1, p2 = plt.ginput(2)
     plt.close()

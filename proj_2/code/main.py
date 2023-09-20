@@ -499,7 +499,7 @@ def main():
     
     
     # old vs young
-    img_path = osp.join(fileroot, "old_vs_young.JPG")
+    img_path = osp.join(fileroot, "old_vs_young.jpg")
     result_path = osp.join(result_root, "old_vs_young.jpg")
     img = skio.imread(img_path) / 255
     half = img.shape[0] // 2

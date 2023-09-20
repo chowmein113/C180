@@ -1,0 +1,692 @@
+<html><head><meta http-equiv="Content-Type" content="text/html; charset=utf-8"/><title>CS 180 Project 2: Fun with Filters and Frequencies!</title><style>cs 180
+/* cspell:disable-file */
+/* webkit printing magic: print all background colors */
+html {
+	-webkit-print-color-adjust: exact;
+}
+* {
+	box-sizing: border-box;
+	-webkit-print-color-adjust: exact;
+}
+
+html,
+body {
+	margin: 0;
+	padding: 0;
+	background-color: #38383a
+}
+@media only screen {
+	body {
+		margin: 2em auto;
+		max-width: 900px;
+		color: rgb(148, 148, 148);
+	}
+}
+
+body {
+	line-height: 1.5;
+	white-space: pre-wrap;
+}
+
+a,
+a.visited {
+	color: inherit;
+	text-decoration: underline;
+}
+
+.pdf-relative-link-path {
+	font-size: 80%;
+	color: #444;
+}
+
+h1,
+h2,
+h3 {
+	letter-spacing: -0.01em;
+	line-height: 1.2;
+	font-weight: 600;
+	margin-bottom: 0;
+}
+
+.page-title {
+	font-size: 2.5rem;
+	font-weight: 700;
+	margin-top: 0;
+	margin-bottom: 0.75em;
+}
+
+h1 {
+	font-size: 1.875rem;
+	margin-top: 1.875rem;
+}
+
+h2 {
+	font-size: 1.5rem;
+	margin-top: 1.5rem;
+}
+
+h3 {
+	font-size: 1.25rem;
+	margin-top: 1.25rem;
+}
+
+.source {
+	border: 1px solid #c44747;
+	border-radius: 3px;
+	padding: 1.5em;
+	word-break: break-all;
+}
+
+.callout {
+	border-radius: 3px;
+	padding: 1rem;
+}
+
+figure {
+	margin: 1.25em 0;
+	page-break-inside: avoid;
+}
+
+figcaption {
+	opacity: 0.5;
+	font-size: 85%;
+	margin-top: 0.5em;
+}
+
+mark {
+	background-color: transparent;
+}
+
+.indented {
+	padding-left: 1.5em;
+}
+
+hr {
+	background: transparent;
+	display: block;
+	width: 100%;
+	height: 1px;
+	visibility: visible;
+	border: none;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.09);
+}
+
+img {
+	max-width: 100%;
+}
+
+@media only print {
+	img {
+		max-height: 100vh;
+		object-fit: contain;
+	}
+}
+
+@page {
+	margin: 1in;
+}
+
+.collection-content {
+	font-size: 0.875rem;
+}
+
+.column-list {
+	display: flex;
+	justify-content: space-between;
+}
+
+.column {
+	padding: 0 1em;
+}
+
+.column:first-child {
+	padding-left: 0;
+}
+
+.column:last-child {
+	padding-right: 0;
+}
+
+.table_of_contents-item {
+	display: block;
+	font-size: 0.875rem;
+	line-height: 1.3;
+	padding: 0.125rem;
+}
+
+.table_of_contents-indent-1 {
+	margin-left: 1.5rem;
+}
+
+.table_of_contents-indent-2 {
+	margin-left: 3rem;
+}
+
+.table_of_contents-indent-3 {
+	margin-left: 4.5rem;
+}
+
+.table_of_contents-link {
+	text-decoration: none;
+	opacity: 0.7;
+	border-bottom: 1px solid rgba(55, 53, 47, 0.18);
+}
+
+table,
+th,
+td {
+	border: 1px solid rgba(55, 53, 47, 0.09);
+	border-collapse: collapse;
+}
+
+table {
+	border-left: none;
+	border-right: none;
+}
+
+th,
+td {
+	font-weight: normal;
+	padding: 0.25em 0.5em;
+	line-height: 1.5;
+	min-height: 1.5em;
+	text-align: left;
+}
+
+th {
+	color: rgba(55, 53, 47, 0.6);
+}
+
+ol,
+ul {
+	margin: 0;
+	margin-block-start: 0.6em;
+	margin-block-end: 0.6em;
+}
+
+li > ol:first-child,
+li > ul:first-child {
+	margin-block-start: 0.6em;
+}
+
+ul > li {
+	list-style: disc;
+}
+
+ul.to-do-list {
+	padding-inline-start: 0;
+}
+
+ul.to-do-list > li {
+	list-style: none;
+}
+
+.to-do-children-checked {
+	text-decoration: line-through;
+	opacity: 0.375;
+}
+
+ul.toggle > li {
+	list-style: none;
+}
+
+ul {
+	padding-inline-start: 1.7em;
+}
+
+ul > li {
+	padding-left: 0.1em;
+}
+
+ol {
+	padding-inline-start: 1.6em;
+}
+
+ol > li {
+	padding-left: 0.2em;
+}
+
+.mono ol {
+	padding-inline-start: 2em;
+}
+
+.mono ol > li {
+	text-indent: -0.4em;
+}
+
+.toggle {
+	padding-inline-start: 0em;
+	list-style-type: none;
+}
+
+/* Indent toggle children */
+.toggle > li > details {
+	padding-left: 1.7em;
+}
+
+.toggle > li > details > summary {
+	margin-left: -1.1em;
+}
+
+.selected-value {
+	display: inline-block;
+	padding: 0 0.5em;
+	background: rgba(206, 205, 202, 0.5);
+	border-radius: 3px;
+	margin-right: 0.5em;
+	margin-top: 0.3em;
+	margin-bottom: 0.3em;
+	white-space: nowrap;
+}
+
+.collection-title {
+	display: inline-block;
+	margin-right: 1em;
+}
+
+.page-description {
+    margin-bottom: 2em;
+}
+
+.simple-table {
+	margin-top: 1em;
+	font-size: 0.875rem;
+	empty-cells: show;
+}
+.simple-table td {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table th {
+	height: 29px;
+	min-width: 120px;
+}
+
+.simple-table-header-color {
+	background: rgb(247, 246, 243);
+	color: black;
+}
+.simple-table-header {
+	font-weight: 500;
+}
+
+time {
+	opacity: 0.5;
+}
+
+.icon {
+	display: inline-block;
+	max-width: 1.2em;
+	max-height: 1.2em;
+	text-decoration: none;
+	vertical-align: text-bottom;
+	margin-right: 0.5em;
+}
+
+img.icon {
+	border-radius: 3px;
+}
+
+.user-icon {
+	width: 1.5em;
+	height: 1.5em;
+	border-radius: 100%;
+	margin-right: 0.5rem;
+}
+
+.user-icon-inner {
+	font-size: 0.8em;
+}
+
+.text-icon {
+	border: 1px solid #000;
+	text-align: center;
+}
+
+.page-cover-image {
+	display: block;
+	object-fit: cover;
+	width: 100%;
+	max-height: 30vh;
+}
+
+.page-header-icon {
+	font-size: 3rem;
+	margin-bottom: 1rem;
+}
+
+.page-header-icon-with-cover {
+	margin-top: -0.72em;
+	margin-left: 0.07em;
+}
+
+.page-header-icon img {
+	border-radius: 3px;
+}
+
+.link-to-page {
+	margin: 1em 0;
+	padding: 0;
+	border: none;
+	font-weight: 500;
+}
+
+p > .user {
+	opacity: 0.5;
+}
+
+td > .user,
+td > time {
+	white-space: nowrap;
+}
+
+input[type="checkbox"] {
+	transform: scale(1.5);
+	margin-right: 0.6em;
+	vertical-align: middle;
+}
+
+p {
+	margin-top: 0.5em;
+	margin-bottom: 0.5em;
+}
+
+.image {
+	border: none;
+	margin: 1.5em 0;
+	padding: 0;
+	border-radius: 0;
+	text-align: center;
+}
+
+.code,
+code {
+	background: rgba(135, 131, 120, 0.15);
+	border-radius: 3px;
+	padding: 0.2em 0.4em;
+	border-radius: 3px;
+	font-size: 85%;
+	tab-size: 2;
+}
+
+code {
+	color: #eb5757;
+}
+
+.code {
+	padding: 1.5em 1em;
+}
+
+.code-wrap {
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.code > code {
+	background: none;
+	padding: 0;
+	font-size: 100%;
+	color: inherit;
+}
+
+blockquote {
+	font-size: 1.25em;
+	margin: 1em 0;
+	padding-left: 1em;
+	border-left: 3px solid rgb(55, 53, 47);
+}
+
+.bookmark {
+	text-decoration: none;
+	max-height: 8em;
+	padding: 0;
+	display: flex;
+	width: 100%;
+	align-items: stretch;
+}
+
+.bookmark-title {
+	font-size: 0.85em;
+	overflow: hidden;
+	text-overflow: ellipsis;
+	height: 1.75em;
+	white-space: nowrap;
+}
+
+.bookmark-text {
+	display: flex;
+	flex-direction: column;
+}
+
+.bookmark-info {
+	flex: 4 1 180px;
+	padding: 12px 14px 14px;
+	display: flex;
+	flex-direction: column;
+	justify-content: space-between;
+}
+
+.bookmark-image {
+	width: 33%;
+	flex: 1 1 180px;
+	display: block;
+	position: relative;
+	object-fit: cover;
+	border-radius: 1px;
+}
+
+.bookmark-description {
+	color: rgba(55, 53, 47, 0.6);
+	font-size: 0.75em;
+	overflow: hidden;
+	max-height: 4.5em;
+	word-break: break-word;
+}
+
+.bookmark-href {
+	font-size: 0.75em;
+	margin-top: 0.25em;
+}
+
+.sans { font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol"; }
+.code { font-family: "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace; }
+.serif { font-family: Lyon-Text, Georgia, ui-serif, serif; }
+.mono { font-family: iawriter-mono, Nitti, Menlo, Courier, monospace; }
+.pdf .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK JP'; }
+.pdf:lang(zh-CN) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK SC'; }
+.pdf:lang(zh-TW) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK TC'; }
+.pdf:lang(ko-KR) .sans { font-family: Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, "Apple Color Emoji", Arial, sans-serif, "Segoe UI Emoji", "Segoe UI Symbol", 'Twemoji', 'Noto Color Emoji', 'Noto Sans CJK KR'; }
+.pdf .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .code { font-family: Source Code Pro, "SFMono-Regular", Menlo, Consolas, "PT Mono", "Liberation Mono", Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.pdf .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK JP'; }
+.pdf:lang(zh-CN) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK SC'; }
+.pdf:lang(zh-TW) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK TC'; }
+.pdf:lang(ko-KR) .serif { font-family: PT Serif, Lyon-Text, Georgia, ui-serif, serif, 'Twemoji', 'Noto Color Emoji', 'Noto Serif CJK KR'; }
+.pdf .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK JP'; }
+.pdf:lang(zh-CN) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK SC'; }
+.pdf:lang(zh-TW) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK TC'; }
+.pdf:lang(ko-KR) .mono { font-family: PT Mono, iawriter-mono, Nitti, Menlo, Courier, monospace, 'Twemoji', 'Noto Color Emoji', 'Noto Sans Mono CJK KR'; }
+.highlight-default {
+	color: rgba(55, 53, 47, 1);
+}
+.highlight-gray {
+	color: rgba(120, 119, 116, 1);
+	fill: rgba(120, 119, 116, 1);
+}
+.highlight-brown {
+	color: rgba(159, 107, 83, 1);
+	fill: rgba(159, 107, 83, 1);
+}
+.highlight-orange {
+	color: rgba(217, 115, 13, 1);
+	fill: rgba(217, 115, 13, 1);
+}
+.highlight-yellow {
+	color: rgba(203, 145, 47, 1);
+	fill: rgba(203, 145, 47, 1);
+}
+.highlight-teal {
+	color: rgba(68, 131, 97, 1);
+	fill: rgba(68, 131, 97, 1);
+}
+.highlight-blue {
+	color: rgba(51, 126, 169, 1);
+	fill: rgba(51, 126, 169, 1);
+}
+.highlight-purple {
+	color: rgba(144, 101, 176, 1);
+	fill: rgba(144, 101, 176, 1);
+}
+.highlight-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.highlight-red {
+	color: rgba(212, 76, 71, 1);
+	fill: rgba(212, 76, 71, 1);
+}
+.highlight-gray_background {
+	background: rgba(241, 241, 239, 1);
+}
+.highlight-brown_background {
+	background: rgba(244, 238, 238, 1);
+}
+.highlight-orange_background {
+	background: rgba(251, 236, 221, 1);
+}
+.highlight-yellow_background {
+	background: rgba(251, 243, 219, 1);
+}
+.highlight-teal_background {
+	background: rgba(237, 243, 236, 1);
+}
+.highlight-blue_background {
+	background: rgba(231, 243, 248, 1);
+}
+.highlight-purple_background {
+	background: rgba(244, 240, 247, 0.8);
+}
+.highlight-pink_background {
+	background: rgba(249, 238, 243, 0.8);
+}
+.highlight-red_background {
+	background: rgba(253, 235, 236, 1);
+}
+.block-color-default {
+	color: inherit;
+	fill: inherit;
+}
+.block-color-gray {
+	color: rgba(120, 119, 116, 1);
+	fill: rgba(120, 119, 116, 1);
+}
+.block-color-brown {
+	color: rgba(159, 107, 83, 1);
+	fill: rgba(159, 107, 83, 1);
+}
+.block-color-orange {
+	color: rgba(217, 115, 13, 1);
+	fill: rgba(217, 115, 13, 1);
+}
+.block-color-yellow {
+	color: rgba(203, 145, 47, 1);
+	fill: rgba(203, 145, 47, 1);
+}
+.block-color-teal {
+	color: rgba(68, 131, 97, 1);
+	fill: rgba(68, 131, 97, 1);
+}
+.block-color-blue {
+	color: rgba(51, 126, 169, 1);
+	fill: rgba(51, 126, 169, 1);
+}
+.block-color-purple {
+	color: rgba(144, 101, 176, 1);
+	fill: rgba(144, 101, 176, 1);
+}
+.block-color-pink {
+	color: rgba(193, 76, 138, 1);
+	fill: rgba(193, 76, 138, 1);
+}
+.block-color-red {
+	color: rgba(212, 76, 71, 1);
+	fill: rgba(212, 76, 71, 1);
+}
+.block-color-gray_background {
+	background: rgba(241, 241, 239, 1);
+}
+.block-color-brown_background {
+	background: rgba(244, 238, 238, 1);
+}
+.block-color-orange_background {
+	background: rgba(251, 236, 221, 1);
+}
+.block-color-yellow_background {
+	background: rgba(251, 243, 219, 1);
+}
+.block-color-teal_background {
+	background: rgba(237, 243, 236, 1);
+}
+.block-color-blue_background {
+	background: rgba(231, 243, 248, 1);
+}
+.block-color-purple_background {
+	background: rgba(244, 240, 247, 0.8);
+}
+.block-color-pink_background {
+	background: rgba(249, 238, 243, 0.8);
+}
+.block-color-red_background {
+	background: rgba(253, 235, 236, 1);
+}
+.select-value-color-interactiveBlue { background-color: rgba(35, 131, 226, .07); }
+.select-value-color-pink { background-color: rgba(245, 224, 233, 1); }
+.select-value-color-purple { background-color: rgba(232, 222, 238, 1); }
+.select-value-color-green { background-color: rgba(219, 237, 219, 1); }
+.select-value-color-gray { background-color: rgba(227, 226, 224, 1); }
+.select-value-color-translucentGray { background-color: rgba(255, 255, 255, 0.0375); }
+.select-value-color-orange { background-color: rgba(250, 222, 201, 1); }
+.select-value-color-brown { background-color: rgba(238, 224, 218, 1); }
+.select-value-color-red { background-color: rgba(255, 226, 221, 1); }
+.select-value-color-yellow { background-color: rgba(253, 236, 200, 1); }
+.select-value-color-blue { background-color: rgba(211, 229, 239, 1); }
+.select-value-color-pageGlass { background-color: undefined; }
+.select-value-color-washGlass { background-color: undefined; }
+
+.checkbox {
+	display: inline-flex;
+	vertical-align: text-bottom;
+	width: 16;
+	height: 16;
+	background-size: 16px;
+	margin-left: 2px;
+	margin-right: 5px;
+}
+
+.checkbox-on {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20width%3D%2216%22%20height%3D%2216%22%20fill%3D%22%2358A9D7%22%2F%3E%0A%3Cpath%20d%3D%22M6.71429%2012.2852L14%204.9995L12.7143%203.71436L6.71429%209.71378L3.28571%206.2831L2%207.57092L6.71429%2012.2852Z%22%20fill%3D%22white%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+
+.checkbox-off {
+	background-image: url("data:image/svg+xml;charset=UTF-8,%3Csvg%20width%3D%2216%22%20height%3D%2216%22%20viewBox%3D%220%200%2016%2016%22%20fill%3D%22none%22%20xmlns%3D%22http%3A%2F%2Fwww.w3.org%2F2000%2Fsvg%22%3E%0A%3Crect%20x%3D%220.75%22%20y%3D%220.75%22%20width%3D%2214.5%22%20height%3D%2214.5%22%20fill%3D%22white%22%20stroke%3D%22%2336352F%22%20stroke-width%3D%221.5%22%2F%3E%0A%3C%2Fsvg%3E");
+}
+	
+</style></head><body><article id="220a0042-d003-48f4-b1b7-f4c5f42a299c" class="page sans"><header><img class="page-cover-image" src="images/1-pineforest.jpg" style="object-position:center 50%"/><h1 class="page-title">CS 180 Project 2: <strong>Fun with Filters and Frequencies!</strong></h1><p class="page-description"></p></header><div class="page-body"><h2 id="669a5b57-0c33-4d15-82b6-6adc4f102de6" class="">By Kevin Chow</h2><figure class="block-color-yellow_background callout" style="white-space:pre-wrap;display:flex" id="539181d8-f957-4301-b960-714d132ca12b"><div style="font-size:1.5em"><span class="icon">📧</span></div><div style="width:100%">contact: chowmein113@berkeley.edu</div></figure><h1 id="ac5e606b-2999-4dd1-9cfa-5980d78f394a" class="">Abstract</h1><figure class="block-color-gray_background callout" style="white-space:pre-wrap;display:flex" id="2cf0e633-35e0-4b3a-85b9-dbfb44b50de6"><div style="font-size:1.5em"><span class="icon">💡</span></div><div style="width:100%">The purpose of this project was to become familiar with frequency analysis, edge detection, and filters for images. I first learned to use finite difference operators as kernels to convolute with 2D greyscale image of the cameraman. I learned how I can compute the gradient magnitude with the resulting convolutions for both D_x and D_y to create an edge detection filter. I also utilized gaussian blurring as a low pass filter along with mathematical manipulation to perform the unsharp mask filter and hybrid image creation by using the resulting low or high pass filters and convolution. Finally I implemented Multi-resolution Blending via Laplacian Pyramid/Stack Blending to blend images like the oraple made from an orange and apple image.</div></figure><details open=""><summary style="font-weight:600;font-size:1.875em;line-height:1.3;margin:0">Part 1: Fun with Filters</summary><div class="indented"><h2 id="fc01b96a-57f1-435f-9de0-65358eef6201" class="">Part 1.1: Finite Difference Operators</h2><p id="c7f19788-4f86-4d79-8993-159422cef01d" class="block-color-teal_background">Given <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mi>x</mi></msub><mo>=</mo><mrow><mo fence="true">[</mo><mtable rowspacing="0.1600em" columnalign="center center" columnspacing="1em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mn>1</mn></mstyle></mtd><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mo>−</mo><mn>1</mn></mrow></mstyle></mtd></mtr></mtable><mo fence="true">]</mo></mrow><msub><mi>D</mi><mi>y</mi></msub><mo>=</mo><mrow><mo fence="true">[</mo><mtable rowspacing="0.1600em" columnalign="center" columnspacing="1em"><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mn>1</mn></mstyle></mtd></mtr><mtr><mtd><mstyle scriptlevel="0" displaystyle="false"><mrow><mo>−</mo><mn>1</mn></mrow></mstyle></mtd></mtr></mtable><mo fence="true">]</mo></mrow></mrow><annotation encoding="application/x-tex">D_x = \begin{bmatrix}1 &amp; -1\end{bmatrix} D_y = \begin{bmatrix}1\\-1\end{bmatrix}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.83333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.151392em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:1.20001em;vertical-align:-0.35001em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size1">[</span></span><span class="mord"><span class="mtable"><span class="col-align-c"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8500000000000001em;"><span style="top:-3.01em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.35000000000000003em;"><span></span></span></span></span></span><span class="arraycolsep" style="width:0.5em;"></span><span class="arraycolsep" style="width:0.5em;"></span><span class="col-align-c"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.8500000000000001em;"><span style="top:-3.01em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">−</span><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.35000000000000003em;"><span></span></span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size1">]</span></span></span><span class="mspace" style="margin-right:0.16666666666666666em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.15139200000000003em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">y</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:2.40003em;vertical-align:-0.95003em;"></span><span class="minner"><span class="mopen delimcenter" style="top:0em;"><span class="delimsizing size3">[</span></span><span class="mord"><span class="mtable"><span class="col-align-c"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:1.45em;"><span style="top:-3.61em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">1</span></span></span><span style="top:-2.4099999999999997em;"><span class="pstrut" style="height:3em;"></span><span class="mord"><span class="mord">−</span><span class="mord">1</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.9500000000000004em;"><span></span></span></span></span></span></span></span><span class="mclose delimcenter" style="top:0em;"><span class="delimsizing size3">]</span></span></span></span></span></span></span><span>﻿</span></span> convolve the kernels with the cameraman image  to get the relations of neighboring pixels in x and y directions. For example, if there is a big change in the x direction of pixel values, the convolution of <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mi>x</mi></msub></mrow><annotation encoding="application/x-tex">D_x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.83333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.151392em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span><span>﻿</span></span> with image <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>I</mi></mrow><annotation encoding="application/x-tex">I</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span></span></span></span></span><span>﻿</span></span> at that point is higher than other values(the convolutions will highlight big changes in x and y respectively of the image). I then use the results to take the gradient magnitude of both outputs to get an edge filtered image.</p><h3 id="1ef0a8bf-821b-49b4-8395-7c93b31fa4f8" class="">Algorithm</h3><p id="88f60ad3-3454-415f-8bbf-7d6822b5c03e" class="">After finding the convolution results of <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mi>x</mi></msub></mrow><annotation encoding="application/x-tex">D_x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.83333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.151392em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span></span></span></span></span><span>﻿</span></span> and <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>D</mi><mi>y</mi></msub></mrow><annotation encoding="application/x-tex">D_y</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.969438em;vertical-align:-0.286108em;"></span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.15139200000000003em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">y</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span></span></span></span></span><span>﻿</span></span> with the image <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>I</mi></mrow><annotation encoding="application/x-tex">I</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span></span></span></span></span><span>﻿</span></span>, compute gradient magnitude <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><msub><mi>G</mi><mi>M</mi></msub><mo>=</mo><msqrt><mrow><mo stretchy="false">(</mo><mo stretchy="false">(</mo><msub><mi>D</mi><mi>x</mi></msub><mo>∗</mo><mi>I</mi><msup><mo stretchy="false">)</mo><mn>2</mn></msup><mo>+</mo><mo stretchy="false">(</mo><msub><mi>D</mi><mi>y</mi></msub><mo>∗</mo><mi>I</mi><msup><mo stretchy="false">)</mo><mn>2</mn></msup><mo stretchy="false">)</mo></mrow></msqrt></mrow><annotation encoding="application/x-tex">G_M=\sqrt{((D_x * I)^2 + (D_y*I)^2)}</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.83333em;vertical-align:-0.15em;"></span><span class="mord"><span class="mord mathnormal">G</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.32833099999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.10903em;">M</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:1.24em;vertical-align:-0.32305399999999995em;"></span><span class="mord sqrt"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.916946em;"><span class="svg-align" style="top:-3.2em;"><span class="pstrut" style="height:3.2em;"></span><span class="mord" style="padding-left:1em;"><span class="mopen">((</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.151392em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight">x</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.740108em;"><span style="top:-2.9890000000000003em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mopen">(</span><span class="mord"><span class="mord mathnormal" style="margin-right:0.02778em;">D</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.15139200000000003em;"><span style="top:-2.5500000000000003em;margin-left:-0.02778em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.03588em;">y</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.286108em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span><span class="mclose"><span class="mclose">)</span><span class="msupsub"><span class="vlist-t"><span class="vlist-r"><span class="vlist" style="height:0.740108em;"><span style="top:-2.9890000000000003em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mtight">2</span></span></span></span></span></span></span></span><span class="mclose">)</span></span></span><span style="top:-2.8769460000000002em;"><span class="pstrut" style="height:3.2em;"></span><span class="hide-tail" style="min-width:1.02em;height:1.28em;"><svg width='400em' height='1.28em' viewBox='0 0 400000 1296' preserveAspectRatio='xMinYMin slice'><path d='M263,681c0.7,0,18,39.7,52,119
+c34,79.3,68.167,158.7,102.5,238c34.3,79.3,51.8,119.3,52.5,120
+c340,-704.7,510.7,-1060.3,512,-1067
+l0 -0
+c4.7,-7.3,11,-11,19,-11
+H40000v40H1012.3
+s-271.3,567,-271.3,567c-38.7,80.7,-84,175,-136,283c-52,108,-89.167,185.3,-111.5,232
+c-22.3,46.7,-33.8,70.3,-34.5,71c-4.7,4.7,-12.3,7,-23,7s-12,-1,-12,-1
+s-109,-253,-109,-253c-72.7,-168,-109.3,-252,-110,-252c-10.7,8,-22,16.7,-34,26
+c-22,17.3,-33.3,26,-34,26s-26,-26,-26,-26s76,-59,76,-59s76,-60,76,-60z
+M1001 80h400000v40h-400000z'/></svg></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.32305399999999995em;"><span></span></span></span></span></span></span></span></span></span><span>﻿</span></span> and <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi mathvariant="normal">∀</mi><mtext> </mtext><mi>x</mi><mtext> </mtext><mi>ϵ</mi><mtext> </mtext><msub><mi>G</mi><mi>M</mi></msub><mtext> </mtext><mi>x</mi><mo>&gt;</mo><mi>t</mi><mi>h</mi><mi>r</mi><mi>e</mi><mi>s</mi><mi>h</mi><mi>o</mi><mi>l</mi><mi>d</mi></mrow><annotation encoding="application/x-tex">\forall\: x\:\epsilon \: G_M \: x &gt; threshold</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.84444em;vertical-align:-0.15em;"></span><span class="mord">∀</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord mathnormal">ϵ</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord"><span class="mord mathnormal">G</span><span class="msupsub"><span class="vlist-t vlist-t2"><span class="vlist-r"><span class="vlist" style="height:0.32833099999999993em;"><span style="top:-2.5500000000000003em;margin-left:0em;margin-right:0.05em;"><span class="pstrut" style="height:2.7em;"></span><span class="sizing reset-size6 size3 mtight"><span class="mord mathnormal mtight" style="margin-right:0.10903em;">M</span></span></span></span><span class="vlist-s">​</span></span><span class="vlist-r"><span class="vlist" style="height:0.15em;"><span></span></span></span></span></span></span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mord mathnormal">x</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">&gt;</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:0.69444em;vertical-align:0em;"></span><span class="mord mathnormal">t</span><span class="mord mathnormal">h</span><span class="mord mathnormal">res</span><span class="mord mathnormal">h</span><span class="mord mathnormal">o</span><span class="mord mathnormal" style="margin-right:0.01968em;">l</span><span class="mord mathnormal">d</span></span></span></span></span><span>﻿</span></span> <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>x</mi></mrow><annotation encoding="application/x-tex">x</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.43056em;vertical-align:0em;"></span><span class="mord mathnormal">x</span></span></span></span></span><span>﻿</span></span> is kept otherwise its thrown out to reduce noise. I found that the threshold value, 0.35 works best as can be seen down below.</p><h3 id="384c51cf-9c0a-4d03-a365-11c4504c11f4" class="">Results</h3><figure id="a98dc8ec-bb45-4173-a04e-24a09ed1b346" class="image"><a href="images/part_1_1.png"><img style="width:1920px" src="images/part_1_1.png"/></a></figure><p id="468d59f8-0208-4c91-aa12-5481b577aa7b" class="">
+</p><h2 id="398b89b6-b5cd-41d7-b5d6-9eadbaff9ae6" class="">Part 1.2: Derivative of Gaussian Filter</h2><p id="3f2a080c-0654-4d1c-ae4f-c28c1bfa4138" class="block-color-teal_background">This task was mainly to show the communitive and additive properties of convolutions. The task was performing convolutions on gaussian kernel and difference operators and applying to an image or performing convolution of gaussian and image and then applying convolution with he difference operators and the results we the same, showing the order did not matter.</p><h3 id="8fa4b445-0039-4f44-ae76-8102bc855901" class="">Results</h3><figure id="f7e23844-36ae-41a6-9d4a-487b74b4db63" class="image"><a href="images/part_1_2.png"><img style="width:1920px" src="images/part_1_2.png"/></a></figure><figure id="bec2b681-887d-48c6-a95b-5fdf783f5c62" class="image"><a href="images/part_1_total.png"><img style="width:1920px" src="images/part_1_total.png"/></a></figure><h3 id="7f211c30-c6a1-4242-9799-05984f0a7b54" class="">Questions</h3><ul id="91c6b3ab-ada9-4dfd-9e1d-583da20522e8" class="bulleted-list"><li style="list-style-type:disc">What differences do you see?<ul id="1fdf16de-0426-4fa3-8c89-aef85a716a8f" class="bulleted-list"><li style="list-style-type:circle">The result has a lot less noise. This is likely because gaussian filter remove high frequencies which can cause noise because they are abrupt disruptions, which will make the noise more amplified after convolving the image with the finite difference operators.</li></ul></li></ul><ul id="4e5d95a0-8c07-41f6-863c-667291613491" class="bulleted-list"><li style="list-style-type:disc">Verify that you get the same results of the image applying the Derivative of Gaussian filter and the finite difference operators on the low pass image<ul id="7e1c39cb-91ad-431e-941c-a0df77b8d72d" class="bulleted-list"><li style="list-style-type:circle">The results are visually the same as can be seen in the figures above</li></ul></li></ul><p id="728b04d0-e148-4b0c-8c1f-87ea98e1995f" class="">
+</p></div></details><details open=""><summary style="font-weight:600;font-size:1.875em;line-height:1.3;margin:0">Part 2: <strong>Fun with Frequencies!</strong></summary><div class="indented"><details open=""><summary style="font-weight:600;font-size:1.5em;line-height:1.3;margin:0">Part 2.1: <strong>Image &quot;Sharpening&quot;</strong></summary><div class="indented"><p id="7e066751-3bd7-4bd1-9d42-aded49d59b2a" class="block-color-teal_background">I implemented the Unsharp Mask Filter on an image by using the equation:  <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>I</mi><mo>+</mo><mi>α</mi><mo stretchy="false">(</mo><mi>I</mi><mo>−</mo><mi>I</mi><mo>∗</mo><mi>G</mi><mo stretchy="false">)</mo><mo>=</mo><mi>f</mi><mo>∗</mo><mo stretchy="false">(</mo><mo stretchy="false">(</mo><mn>1</mn><mo>+</mo><mi>α</mi><mo stretchy="false">)</mo><mi>e</mi><mo>−</mo><mi>α</mi><mi>G</mi><mo stretchy="false">)</mo></mrow><annotation encoding="application/x-tex">I+\alpha(I -I*G)=f*((1+\alpha)e-\alpha G)</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.76666em;vertical-align:-0.08333em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mopen">(</span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal">G</span><span class="mclose">)</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span><span class="mrel">=</span><span class="mspace" style="margin-right:0.2777777777777778em;"></span></span><span class="base"><span class="strut" style="height:0.8888799999999999em;vertical-align:-0.19444em;"></span><span class="mord mathnormal" style="margin-right:0.10764em;">f</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">∗</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mopen">((</span><span class="mord">1</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">+</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mclose">)</span><span class="mord mathnormal">e</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span><span class="mbin">−</span><span class="mspace" style="margin-right:0.2222222222222222em;"></span></span><span class="base"><span class="strut" style="height:1em;vertical-align:-0.25em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span><span class="mord mathnormal">G</span><span class="mclose">)</span></span></span></span></span><span>﻿</span></span> where <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>I</mi></mrow><annotation encoding="application/x-tex">I</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.07847em;">I</span></span></span></span></span><span>﻿</span></span> is the image, <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>G</mi></mrow><annotation encoding="application/x-tex">G</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.68333em;vertical-align:0em;"></span><span class="mord mathnormal">G</span></span></span></span></span><span>﻿</span></span> is the gaussian kernel, <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>e</mi></mrow><annotation encoding="application/x-tex">e</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.43056em;vertical-align:0em;"></span><span class="mord mathnormal">e</span></span></span></span></span><span>﻿</span></span> is the unit impulse, and <style>@import url('https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.13.2/katex.min.css')</style><span data-token-index="0" contenteditable="false" class="notion-text-equation-token" style="user-select:all;-webkit-user-select:all;-moz-user-select:all"><span></span><span><span class="katex"><span class="katex-mathml"><math xmlns="http://www.w3.org/1998/Math/MathML"><semantics><mrow><mi>α</mi></mrow><annotation encoding="application/x-tex">\alpha</annotation></semantics></math></span><span class="katex-html" aria-hidden="true"><span class="base"><span class="strut" style="height:0.43056em;vertical-align:0em;"></span><span class="mord mathnormal" style="margin-right:0.0037em;">α</span></span></span></span></span><span>﻿</span></span> is the arbitrary constant multiplier to pronounce the high frequencies</p><h3 id="372b36e0-f18e-426a-a26b-f6f798664102" class="">Results</h3><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Taj</summary><div class="indented"><h3 id="8303a219-aa1b-4104-8d0e-25f910d20774" class="">Comparison Graph</h3><figure id="9a106fc1-c188-4950-99b3-e9d694cce5e6" class="image"><a href="images/taj_result.png"><img style="width:1920px" src="images/taj_result.png"/></a></figure></div></details><p id="d5575766-f1b1-4de1-af7c-0cf8ce8782d6" class="">
+</p><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Killer Bean Poster</summary><div class="indented"><h3 id="aea8f659-8e72-441c-8c94-ba0c2269fbb3" class="">Comparison Graph</h3><figure id="e4c13960-690f-4690-b5c4-690bf8bb8221" class="image"><a href="images/killer_bean_result.png"><img style="width:1920px" src="images/killer_bean_result.png"/></a></figure><h3 id="c649afc4-7721-4d9d-8d1c-fe7aeb76a896" class="">Original Image</h3><figure id="c8774401-f945-4198-bcd6-e5d24757d2da" class="image"><a href="images/da_bean.jpg"><img style="width:187px" src="images/da_bean.jpg"/></a></figure><h3 id="2e531446-3497-4522-9274-c909e4799447" class="">Sharpened Image</h3><figure id="5a71ea7a-bb1f-4d6a-ab4e-01cf58e36f21" class="image"><a href="images/killer_bean_sharp.png"><img style="width:187px" src="images/killer_bean_sharp.png"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Killer Bean Movie Advertisement</summary><div class="indented"><h3 id="9c408ecd-b7c8-4c38-9d6f-1b8cccf08839" class="">Comparison Graph</h3><figure id="9998ac55-4b84-4f1a-9942-7d503595c9f6" class="image"><a href="images/beany_res_result.png"><img style="width:1920px" src="images/beany_res_result.png"/></a></figure><h3 id="e748300c-49f0-4bd9-86e1-0dd13d88cc55" class="">Original Image</h3><figure id="423b87e2-532f-4b55-aaa3-77852246a03e" class="image"><a href="images/beany.jpg"><img style="width:1280px" src="images/beany.jpg"/></a></figure><h3 id="b17395fe-d460-46a9-a18d-a1077360bf82" class="">Sharpened Image</h3><figure id="67df438a-aec7-4b0e-b123-f3971224f32d" class="image"><a href="images/beany_res_sharp.png"><img style="width:1280px" src="images/beany_res_sharp.png"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Re-sharpened Image from low passed image</summary><div class="indented"><h3 id="4a77162f-eb49-4303-81a7-ff035735fefb" class="">Comparison Graph</h3><figure id="2e981e5f-4213-4646-b6f0-3de22b4c409c" class="image"><a href="images/reblurred_killer_bean.png"><img style="width:1920px" src="images/reblurred_killer_bean.png"/></a></figure><p id="2cadca5e-2588-4fe7-9c4c-b4be83badd98" class="">
+</p></div></details></div></details><details open=""><summary style="font-weight:600;font-size:1.5em;line-height:1.3;margin:0">Part 2.2: Hybrid Images</summary><div class="indented"><p id="f1c0433e-4680-4b10-8d1e-3f91b422fff9" class="block-color-teal_background">This task involved creating the low pass filter with a tuned cutoff frequency and a high pass filter with another tuned cutoff frequency to combine two images together that change with viewing distance. The idea is that we see high frequencies up close, but low frequencies far away. This means we can use high and low frequency images to have a hybrid “changing” image</p><h3 id="bf6cba34-d657-4f46-81f9-6ed584075a11" class="">Results</h3><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Boy and Shiba Inu</summary><div class="indented"><h3 id="d267dcfc-df2f-44a7-813a-d23e6225f6fe" class="">Comparison Graph</h3><figure id="de4b0dd6-bf10-496a-a35d-ef2551f5fbfb" class="image"><a href="images/him_vs_shiba.png"><img style="width:1920px" src="images/him_vs_shiba.png"/></a></figure><h3 id="dbe2e4e0-bc2f-4879-9d89-05050e10d781" class="">Original Images</h3><figure id="66356c4a-4a56-46a1-9d8b-bedf8fab9914" class="image"><a href="images/him.jpeg"><img style="width:1241px" src="images/him.jpeg"/></a></figure><figure id="c4f337b2-bcf8-4e03-a2ae-5337678f8720" class="image"><a href="images/shiba.png"><img style="width:943px" src="images/shiba.png"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Old vs Young guy</summary><div class="indented"><h3 id="2b7da753-26cf-4456-8592-0ed9c2d098b5" class="">Comparison Graph</h3><figure id="4c7e1798-eae5-4c15-a38c-d175ee6aed04" class="image"><a href="images/old_vs_young.png"><img style="width:1920px" src="images/old_vs_young.png"/></a></figure><p id="7844f6e2-63c8-40e3-b154-b7fe4ed95cc4" class="">
+</p><h3 id="32752b02-b080-4a27-85f7-b29db23f2111" class="">Original Images</h3><figure id="cb609e21-1c35-4e88-b3eb-cf59dd73a2af" class="image"><a href="images/old_vs_young.jpg"><img style="width:698px" src="images/old_vs_young.jpg"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Jet and Killer Bean</summary><div class="indented"><h3 id="421cf7cf-cca3-4acf-939e-bff6321c040c" class="">Comparison Graph</h3><figure id="42595419-222a-4b07-a737-933c47b867b3" class="image"><a href="images/jet_killer_bean_hybrid.png"><img style="width:1920px" src="images/jet_killer_bean_hybrid.png"/></a></figure><h3 id="b792a67e-7ebf-4fb2-97e6-34f5258cb6fa" class="">Frequency Response</h3><figure id="bd8c3c79-0bdb-4f2d-82c4-2dfe51992c4c" class="image"><a href="images/jet_killer_freq_domain.png"><img style="width:1920px" src="images/jet_killer_freq_domain.png"/></a></figure><h3 id="db9aaf30-e23f-4601-a821-702af81706c5" class="">Original Images</h3><figure id="9a1a8ad8-b186-4648-a565-876ffbffda8f" class="image"><a href="images/jet_bean.png"><img style="width:350px" src="images/jet_bean.png"/></a></figure><figure id="497f0279-83ee-4a3e-a171-3480c2df9161" class="image"><a href="images/killer_bean.jpg"><img style="width:900px" src="images/killer_bean.jpg"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Girl and Shiba Inu</summary><div class="indented"><p id="d07dd002-e2c0-4069-b392-7ff0ba0d0689" class="">This one failed a bit as the high frequencies could not be tuned to be viewable on the shiba that well</p><h3 id="2c3b9b71-c906-4ab5-8d12-95e376eda0f9" class="">Comparison Graph</h3><figure id="1d8c1da1-d2bf-4c37-847e-1fd718dc6ec1" class="image"><a href="images/shiba_vs_girl.png"><img style="width:1920px" src="images/shiba_vs_girl.png"/></a></figure><h3 id="bee3dc33-886a-4eda-9b7f-2e6638cddd77" class="">Frequency Analysis</h3><figure id="70eca3bd-5cac-4bd0-aa80-ff2e8fc51712" class="image"><a href="images/shiba_vs_girl_freq_domain.png"><img style="width:1920px" src="images/shiba_vs_girl_freq_domain.png"/></a></figure><h3 id="b1de4c01-10ea-4da2-89e7-dd1cbece5824" class="">Original Images</h3><figure id="400ccaa5-3421-4bc2-84aa-89c0aeac1bc1" class="image"><a href="images/side_eye.png"><img style="width:1200px" src="images/side_eye.png"/></a></figure><figure id="3c95384b-22b8-456a-a6f7-178b0c6607e8" class="image"><a href="images/shiba_dumb.jpg"><img style="width:1200px" src="images/shiba_dumb.jpg"/></a></figure></div></details><h2 id="6e33e600-26fc-45cd-9179-86f7d2c11fdf" class="">Bells and Whistles</h2><figure class="block-color-blue_background callout" style="white-space:pre-wrap;display:flex" id="80295b2c-6e6f-4389-94a6-796c73499530"><div style="font-size:1.5em"><span class="icon">💡</span></div><div style="width:100%">Here are results on the Girl and Shiba Inu image using color instead of greyscale. Easier to see full screen.</div></figure><figure id="6715da8c-c668-45ab-91d1-b6757744f347" class="image"><a href="images/shiba_vs_girl_colored.png"><img style="width:1920px" src="images/shiba_vs_girl_colored.png"/></a></figure><figure class="block-color-orange_background callout" style="white-space:pre-wrap;display:flex" id="e6f5e349-c62c-403d-8b9c-cfee4dda6fb0"><div style="font-size:1.5em"><span class="icon">🎃</span></div><div style="width:100%">Analysis: It seems that color works better for low frequency component. Most of the data or color is stored in the lower frequencies as the higher frequencies are more equivalent to noise and noise does not carry much information(color) with it.</div></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.5em;line-height:1.3;margin:0">Part 2.3: Gaussian and Laplacian Stacks</summary><div class="indented"><p id="8cbac937-775e-4114-b22f-ddca7f5d9d0f" class="">For this particular task, I successfully implemented both the Gaussian Stack and the Laplacian Stack. These two techniques played a crucial role in achieving the desired results. The Gaussian Stack helped in smoothing out the image and reducing noise, while the Laplacian Stack was instrumental in splicing the band pass frequencies between the gaussian stack layers. The idea of the stacks is to use these for Laplacian stack or multiresolution blending. Combining the coarsest or lowest frequency base of the image with all the band pass layers in the laplacian stack should recover the original image theoretically, which can be seen in the second figure.</p><h3 id="ac01d0e2-61c7-439f-bed0-3d84c17da844" class="">Oraple output using Gaussian and Laplacian Stacks</h3><figure id="d18c3b0c-b505-4bf6-9a2a-a12ad9768919" class="image"><a href="images/oraple_stacks.png"><img style="width:1920px" src="images/oraple_stacks.png"/></a></figure><figure id="96eb6614-bcfe-4703-a8db-dbf5a4f447b3" class="image"><a href="images/normalized_oraple_stack.png"><img style="width:1920px" src="images/normalized_oraple_stack.png"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.5em;line-height:1.3;margin:0">Part 2.4: Multiresolution Blending</summary><div class="indented"><p id="8a6d5362-4e34-408a-8322-bc3032618754" class="block-color-teal_background">This task involved using the laplacian stacks of two images, as well as the gaussian stack of a mask filter, to compute a blend with an optimal window blend called alpha blending and feathering.</p><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Results</summary><div class="indented"><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">The Oraple</summary><div class="indented"><h3 id="3309e8bf-2c60-462e-9194-6202fba66aae" class="">Comparison Graph</h3><figure id="26029171-d583-4e91-9ae6-776b5983c560" class="image"><a href="images/oraple_combined.png"><img style="width:1920px" src="images/oraple_combined.png"/></a></figure><h3 id="1925337c-70aa-48ef-b735-1919ca382c6f" class="">Original Images</h3><figure id="de5232bd-a143-4341-a227-0db8bae5f837" class="image"><a href="images/apple.jpeg"><img style="width:300px" src="images/apple.jpeg"/></a></figure><figure id="bd011970-ca9b-43b7-b6ca-0e64d01cf05f" class="image"><a href="images/orange.jpeg"><img style="width:300px" src="images/orange.jpeg"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Boy and Shiba Inu</summary><div class="indented"><h3 id="a9401864-8062-4cd1-9aac-af9be4c50cb1" class="">Comparison Graph</h3><figure id="dc45c107-c5d0-4097-8ecc-ffacfbfff095" class="image"><a href="images/shiba_boy_stack.png"><img style="width:1920px" src="images/shiba_boy_stack.png"/></a></figure><h3 id="0917a29c-3094-43db-ab39-5f7820c0986c" class="">Original Images</h3><figure id="ce401682-055f-431d-83ff-5a0b0cc20c60" class="image"><a href="images/shiba.png"><img style="width:943px" src="images/shiba.png"/></a></figure><figure id="7cf22f09-8398-4c78-a7b5-57e17f43aea7" class="image"><a href="images/him.jpeg"><img style="width:1241px" src="images/him.jpeg"/></a></figure></div></details><details open=""><summary style="font-weight:600;font-size:1.25em;line-height:1.3;margin:0">Shiba vs Shiba</summary><div class="indented"><h3 id="c5beaab5-0a2d-42e8-9733-80094007597a" class="">Comparison Graph</h3><figure id="d16aa097-7ee6-444b-a4a1-1e67c63f7983" class="image"><a href="images/shiba_vs_shiba.png"><img style="width:1920px" src="images/shiba_vs_shiba.png"/></a></figure><h3 id="123381a8-33a0-4173-a251-dd081eb75bb4" class="">Original Images</h3><figure id="12ec65c7-2ba1-4962-ae0c-a2675e63a34e" class="image"><a href="images/shiba.png"><img style="width:943px" src="images/shiba.png"/></a></figure><figure id="1e623143-44d1-4122-a07f-4f5cc0614094" class="image"><a href="images/shiba_dumb.jpg"><img style="width:1200px" src="images/shiba_dumb.jpg"/></a></figure></div></details></div></details><h2 id="ddcfeee6-5131-4d2f-bfa4-eb45f12c9bf6" class="">Bells and Whistles</h2><figure class="block-color-purple_background callout" style="white-space:pre-wrap;display:flex" id="8833f936-7bcd-43fc-afce-380fb8222920"><div style="font-size:1.5em"><span class="icon">🚨</span></div><div style="width:100%">I was not aware that multiresolution was meant to be done in greyscale first so all my results are in colored form. The most interesting thing I learned about this project is the power of convolution and relating certain matrix elements to other elements and what that information can tell us/how we can use that. I was also fascinated by image blending and how the laplacian and gaussian stack helps us perform the perfect blend in the spatial domain rather than the horrendous frequency domain. Despite bashing it, I find the fourier frequency response interesting and how a unit impule can be used as a multiplier for the identity in convolution.</div></figure></div></details></div></details><h1 id="fe9f852b-1efa-4da7-b045-f985590f8aba" class="">Problems</h1><figure class="block-color-purple_background callout" style="white-space:pre-wrap;display:flex" id="07ba92a3-653b-4db5-a17a-9fbf1484696f"><div style="font-size:1.5em"><span class="icon">🚨</span></div><div style="width:100%">Some of the problems I ran into was needing to normalize matrices, namely the laplacian layers to be able to view it because their values were so low. I also had problems of numpy array dtypes, some were in int and some were in float, and some were in float but had int range values! I also took a lot of time tuning the right kernel size and making a relation to the sigma value I chose. The last problem I had was with clipping values as I was not aware unsharpen mask filter and laplacian layer formation could create negative or out of range values in the matrices.</div></figure></div></article></body></html>

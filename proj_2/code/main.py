@@ -441,7 +441,7 @@ def main():
     std = 1.0
     parent_dir = osp.dirname(osp.dirname(osp.abspath(__file__)))
     fileroot = osp.join(parent_dir,"images")
-    result_root = osp.join(parent_dir, "results")
+    result_root = fileroot
     # Part 2.1
     
     filename = osp.join(fileroot,"taj.jpg")

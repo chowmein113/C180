@@ -3,9 +3,14 @@ from concurrent.futures.thread import ThreadPoolExecutor
 from skimage.draw import polygon
 from concurrent.futures.thread import ThreadPoolExecutor
 import matplotlib.pyplot as plt
-from scipy.ndimage import shift
+from scipy.ndimage import shift, map_coordinates
+import skimage.io as skio
+import os
+import os.path as osp
+import cv2
 #Global
 MAX_WORKERS = 7
+RECTIFY = True
 def computeH(pts1, pts2) -> np.array:
     """Return homography matrix that maps pts1 to pts 2
     p2 = Hp1
@@ -31,11 +36,15 @@ def computeH(pts1, pts2) -> np.array:
         A.append([0, 0, 0, x1, y1, 1, -x1 * y2, -y1 * y2])
     A = np.array(A)
     b = np.array(b)
-    ata = A.T @ A
-    atb = A.T @ b
-    h = np.linalg.inv(ata) @ atb
+    # ata = A.T @ A
+    # atb = A.T @ b
+    # h = np.linalg.inv(ata) @ atb
+    h, _, _, _ = np.linalg.lstsq(A, b, rcond=-1)
+    h = np.append(h, 1)
     return h.reshape(3, 3)
+
 def apply_alpha(im: np.array) -> np.array:
+    #TODO: FIX
     alpha_im = im
     if len(im.shape) == 3:
         if len(im.shape[2]) == 3:
@@ -44,8 +53,8 @@ def apply_alpha(im: np.array) -> np.array:
     return alpha_im
 def get_pts(im, num_pts=4):
     plt.imshow(im)
-    plt.title("Click at least 4 points")
-    pts = plt.ginput(num_pts)
+    plt.title(f"Click {num_pts} points")
+    pts = plt.ginput(num_pts, timeout=0)
     plt.close()
     return pts
 def ncc(vec1, vec2):
@@ -128,43 +137,145 @@ def refine_by_ncc(im1, im2, pt1, pt2, size=6):
 def warpImage(im, H):
     h, w = im.shape[:2]
     box_corners = [[0, 0], 
-                   [0, h],
-                   [w, 0],
-                   [w, h]]
+                   [0, h - 1],
+                   [w - 1, h - 1],
+                   [w - 1, 0]]
     box_arr = np.array(box_corners)
-    box_arr_pts = np.hstack([np.ones(4)])
-    new_bounds = np.round(H @ box_arr_pts)
+    box_arr_pts = (np.hstack([box_arr, np.ones((4, 1))]))
+    print(f"box_arr_pts: {box_arr_pts}")
+    new_bounds = (H @ box_arr_pts.T)
+    print(f"new bounds: pre{new_bounds}")
     lst = []
     for i in range(4):
         p = new_bounds[:, i]
-        lst.append([p[0] / p[2], p[1] / p[2]])
+        lst.append([int(np.round(p[0] / p[2])), int(np.round(p[1] / p[2]))])
     new_bounds = np.array(lst).T
+    print(f"new bounds: {new_bounds}")
     xMax = np.max(new_bounds[0, :])
-    xMax = max(xMax, im.shape[1])
+    # xMax = max(xMax, im.shape[1])
     yMax = np.max(new_bounds[1, :])
-    yMax = max(yMax, im.shape[0])
+    # yMax = max(yMax, im.shape[0])
     xMin = np.min(new_bounds[0, :])
     yMin = np.min(new_bounds[1, :])
-    shape_max = (yMax + (yMin if yMin < 0 else 0), xMax + (xMin if xMin < 0 else 0))
-    shape_min = (yMin if yMin > 0 else 0, xMin if xMin > 0 else 0)
-    
-    r, c = polgyon(np.squeeze(new_bounds[1, :]), np.squeeze(new_bounds[0, :]))
-def main():
-    im1 = ...
-    im2 = ...
-    points = int(input("How many points?"))
-    pts1 = get_pts(im1, points)
-    pts2 = get_pts(im2, points)
+    off_x = -1 * min(xMin, 0)
+    off_y = -1 * min(yMin, 0)
+    shape_max = (int(max(yMax + off_y, im.shape[0])), int(max(xMax + off_x, im.shape[1])))
+    shape_min = (0, 0)
+    ydist = yMin if yMin < 0 else 0
+    xdist = xMax if xMin < 0 else 0
+    new_img = np.zeros(list(shape_max) + [3])
     
     
+    o_r, o_c = polygon(box_arr[:, 1], box_arr[:, 0])
+    r, c = polygon(np.squeeze(new_bounds[1, :]), np.squeeze(new_bounds[0, :]))
+    # r = np.clip(np.array(r), yMin, yMax - 1)
+    # c = np.clip(np.array(c), xMin, xMax - 1)
+    # r += off_y
+    # c += off_x
+    pts = np.row_stack((c, r, np.ones(r.shape[0])))
+    H_inv = np.linalg.inv(H)
+    pts_in_im = (H_inv @ pts)
+    im_x = np.round(pts_in_im[0, :] / pts_in_im[2, :]).astype(int)
+    im_y = np.round(pts_in_im[1, :] / pts_in_im[2, :]).astype(int)
+    pts[0, :] += off_x
+    pts[1, :] += off_y
+    pts = pts.astype(int)
+    
+    
+    ###not here
+    ins = np.where((im_y >= 0) & (im_y < im.shape[0]) & (im_x >= 0) & (im_x < im.shape[1]))
+    ###
+    f, axs = plt.subplots(1,2)
+    from_im = im[im_y[ins], im_x[ins]]
+    img_copy = np.zeros(im.shape[:2])
+    img_copy[o_r, o_c] = 3
+    img_copy[im_y[ins], im_x[ins]] = 1
+    new_im_cop = np.zeros(new_img.shape[:2])
+    new_im_cop[pts[1, :], pts[0, :]] = 1
+    new_im_cop[pts[1, :][ins], pts[0, :][ins]] = 2
+    # img_copy = (img_copy * 255).astype(np.uint8)
+    ma = np.max(img_copy)
+    mi = np.min(img_copy)
+    axs[0].imshow(img_copy)
+    axs[1].imshow(new_im_cop)
+    plt.show()
+    orr = pts[1, :]
+    print(f"or max: {np.max(orr)} and or min: {np.min(orr)}")
+    occ = pts[0, :]
+    print(f"oc max: {np.max(occ)} and oc min: {np.min(occ)}")
+    new_img[orr[ins], occ[ins]] = from_im
+    ma = np.max(new_img)
+    mi = np.min(new_img)
+    
+    
+    return (new_img * 255).astype(np.uint8)
+    # return (canvas * 255).astype(np.uint8)
 
-    
-                   
-    
-    
-    
-    
-    
 def predict_pt(H, pt1):
     pt2 = H @ pt1
-    return (pt2 / pt2[2])
+    return (pt2 / pt2[2])   
+def get_avg_dist(pts):
+    sum_dist = 0
+    for i in range(pts.shape[0]):
+        for j in range(i - 1, i + 2):
+            pt1 = pts[i, :]
+            pt2 = pts[j % pts.shape[0], :]
+            sum_dist += np.linalg.norm(pt2 - pt1)
+    return sum_dist / pts.shape[0]
+
+
+def main():
+    img_folder = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), "images")
+    im1 = skio.imread(osp.join(img_folder, "walk.png")) / 255
+    
+    # points = int(input("How many points? "))
+    # pts1 = np.round(np.array(get_pts(im1, points)))
+    if RECTIFY:
+        points = 4
+        pts1 = np.round(np.array(get_pts(im1, points))).astype(int)
+        # off_x = np.min(pts1[:, 0])
+        # off_y = np.min(pts1[:, 1])
+        off_x = 100
+        off_y = 100
+        # s = get_avg_dist(pts1)
+        # s = int(np.linalg.norm(pts1[1, :] - pts1[0, :]))
+        # s = im1.shape[0]
+        s = 1000
+        # pts2 = np.array([[0, 0],
+        #                 [0.5, 0],
+        #                 [1, 0],
+        #                 [1, 0.5],
+        #                 [1, 1],
+        #                 [0.5, 1],
+        #                 [0, 1],
+        #                 [0, 0.5]]) * s
+        pts2 = np.array([[0., 0.], #ul
+                        [1., 0.], #ur
+                        [0., 1.],#bl
+                        [1., 1.]]) * s  #br
+        # pts2 = np.array([[1., 0.], #ur
+        #                 [1., 1.], #br
+        #                 [0., 1.],#bl
+        #                 [0., 0.]]) * s #ul
+        # pts2[:, 0] += off_x
+        # pts2[:, 1] += off_y
+        H = computeH(pts1, pts2)
+        # H2 = cv2.findHomography(pts1, pts2)
+        print(f"H: {H}")
+        # print(f"H2: {H2}")
+        new_img = warpImage(im1, H)
+        # new_img = warp_image_rectify(im1, H)
+        # new_img2 = warpImage2(im1, im1, H)
+        f, axs = plt.subplots(1,2)
+        axs[0].set_title("Original Image")
+        axs[0].imshow(im1)
+        axs[1].set_title("Frontal Parallel Rectified Image")
+        axs[1].imshow(new_img)
+        # axs[2].imshow(new_img2)
+        # plt.tight_layout()
+        plt.show()
+        
+    # im2 = ...
+    # pts2 = get_pts(im2, points)
+if __name__ == "__main__":
+    main()

@@ -5,12 +5,17 @@ from concurrent.futures.thread import ThreadPoolExecutor
 import matplotlib.pyplot as plt
 from scipy.ndimage import shift, map_coordinates
 import skimage.io as skio
+import skimage.transform as skt
 import os
 import os.path as osp
+import json
+import pickle
+from pro2_main import gauss_stack, laplace_stack, blend, plot_pyramids, smooth_imgs
 import cv2
 #Global
 MAX_WORKERS = 7
 RECTIFY = True
+SIZE = 864
 def computeH(pts1, pts2) -> np.array:
     """Return homography matrix that maps pts1 to pts 2
     p2 = Hp1
@@ -53,10 +58,39 @@ def apply_alpha(im: np.array) -> np.array:
     return alpha_im
 def get_pts(im, num_pts=4):
     plt.imshow(im)
-    plt.title(f"Click {num_pts} points")
+    plt.title(f"Click {num_pts} points" if not RECTIFY else f"Click {num_pts} points: UL -> UR -> BL -> BR")
     pts = plt.ginput(num_pts, timeout=0)
     plt.close()
     return pts
+def get_corr_pts(im1, im2, num_pts=4):
+    f, axs = plt.subplots(1, 2, figsize=(13, 7))
+    f.suptitle("Get Correspondence Points")
+    axs[0].set_title("first image")
+    axs[0].imshow(im1)
+    axs[1].set_title("second image")
+    axs[1].imshow(im2)
+    pts1 = np.array([])
+    pts2 = np.array([])
+    for i in range(num_pts):
+        f.suptitle(f"Place Correspondence Point {i+1}/{num_pts} on first image")
+        point_im1 = plt.ginput(1, timeout=0)  # returns a list of length 1
+        if pts1.shape[0] < 1:
+            pts1 = np.append(pts1, point_im1[0])
+           
+        else:
+            pts1 = np.vstack([pts1, np.array(point_im1)])
+        axs[0].scatter(point_im1[0][0], point_im1[0][1], color='red', marker='o')
+        f.suptitle(f"Place Correspondence Point {i+1}/{num_pts} on second image")
+        point_im2 = plt.ginput(1, timeout=0)  # returns a list of length 1
+        if pts2.shape[0] < 1:
+            pts2 = np.append(pts2, point_im2[0])
+            
+        else:
+            pts2 = np.vstack([pts2, np.array(point_im2)])
+        
+        axs[1].scatter(point_im2[0][0], point_im2[0][1], color='red', marker='o')
+    plt.close(f)
+    return np.array(pts1), np.array(pts2)
 def ncc(vec1, vec2):
     """Compute Normalized Cross-Correlation between two vectors
 
@@ -68,6 +102,8 @@ def ncc(vec1, vec2):
     Returns:
         int: value of dot product of normalized vectors
     """
+    if vec1.shape != vec2.shape:
+        return 0
     mean1 = np.mean(vec1)
     mean2 = np.mean(vec2)
     cen_vec1 = vec1 - mean1
@@ -122,24 +158,124 @@ def refine_by_ncc(im1, im2, pt1, pt2, size=6):
     np.pad(im1, pad_width=size, mode='constant', constant_values=0)
     max_val = -(float('inf'))
     best_pt1 = pt1
-    for dx in range(-size, size + 1):
-        for dy in range(-size, size + 1):
-            new_pt1_x = pt1[0] + dx
-            new_pt1_y = pt1[1] + dy
-            vec1 = im1[new_pt1_y - size: new_pt1_y + size + 1, new_pt1_x - size: new_pt1_x + size + 1, :].flatten()
-            vec2 = im2[pt2[1] - size: pt2[1] + size + 1, pt2[0] - size: pt2[0] + size + 1, :].flatten()
-            ncc_val = ncc(vec1, vec2)
-            if ncc_val > max_val:
-                max_val = ncc_val
-                best_pt1 = [new_pt1_x, new_pt1_y]
+    im1 = np.pad(im1, pad_width=size, mode='constant')
+    def helper(ncc, vec1, vec2, new_pt1_x, new_pt1_y):
+        return ncc(vec1, vec2), new_pt1_x, new_pt1_y
+    with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
+        threads = []
+        for dx in range(-size, size + 1):
+            for dy in range(-size, size + 1):
+                new_pt1_x = pt1[0] + dx
+                new_pt1_y = pt1[1] + dy
+                vec1 = im1[new_pt1_y - size: new_pt1_y + size + 1, new_pt1_x - size: new_pt1_x + size + 1, :].flatten()
+                vec2 = im2[pt2[1] - size: pt2[1] + size + 1, pt2[0] - size: pt2[0] + size + 1, :].flatten()
+                threads.append(executor.submit(helper, ncc, vec1, vec2, new_pt1_x, new_pt1_y))
+                
+                
+        results = [thread.result() for thread in threads]
+        for i, result in enumerate(results):
+            if result[0] > max_val:
+                max_val = result[0]
+                best_pt1 = [result[1], result[2]]
     return best_pt1, pt2
+def warp_images(im1, im2, H, blend1 = 0.5, blend2 = 0.5):
+    h, w = im1.shape[:2]
+    box_corners = [[0, h - 1], 
+                   [w - 1, h - 1],
+                   [w - 1, 0],
+                   [0, 0]]
+    box_arr = np.array(box_corners)
+    box_arr_pts = (np.hstack([box_arr, np.ones((4, 1))]))
+    print(f"box_arr_pts: {box_arr_pts}")
+    new_bounds = (H @ box_arr_pts.T)
+    print(f"new bounds: pre{new_bounds}")
+    lst = []
+    for i in range(4):
+        p = new_bounds[:, i]
+        lst.append([int(np.round(p[0] / p[2])), int(np.round(p[1] / p[2]))])
+    new_bounds = np.array(lst).T
+    print(f"new bounds: {new_bounds}")
+    xMax = np.max(new_bounds[0, :])
+    # xMax = max(xMax, im.shape[1])
+    yMax = np.max(new_bounds[1, :])
+    # yMax = max(yMax, im.shape[0])
+    xMin = np.min(new_bounds[0, :])
+    yMin = np.min(new_bounds[1, :])
+    off_x = -1 * min(xMin, 0)
+    off_y = -1 * min(yMin, 0)
+    shape_max = (int(max(yMax + off_y, im2.shape[0] + off_y, im1.shape[0])), int(max(xMax + off_x, im2.shape[1] + off_x, im1.shape[1])))
+    shape_min = (0, 0)
+    ydist = yMin if yMin < 0 else 0
+    xdist = xMax if xMin < 0 else 0
+    new_img = np.zeros(list(shape_max) + [3])
     
+    
+    o_r, o_c = polygon(box_arr[:, 1], box_arr[:, 0])
+    print("making polygons...")
+    r, c = polygon(new_bounds[1, :] + off_y, new_bounds[0, :] + off_x)
+    # r = np.clip(np.array(r), yMin, yMax - 1)
+    # c = np.clip(np.array(c), xMin, xMax - 1)
+    # pts_backup = pts = np.row_stack((c - 1, r - 1, np.ones(r.shape[0])))
+    r -= off_y
+    c -= off_x
+    pts = np.row_stack((c, r, np.ones(r.shape[0])))
+    H_inv = np.linalg.inv(H)
+    pts_in_im = (H_inv @ pts)
+    im_x = np.round(pts_in_im[0, :] / pts_in_im[2, :]).astype(int)
+    im_y = np.round(pts_in_im[1, :] / pts_in_im[2, :]).astype(int)
+    pts[0, :] += off_x -1
+    pts[1, :] += off_y -1
+    # pts = pts_backup.astype(int)
+    pts = np.round(pts).astype(int)
+    
+    
+    ###not here
+    ins = np.where((im_y >= 0) & (im_y < im1.shape[0]) & (im_x >= 0) & (im_x < im1.shape[1]))
+    ###
+    f, axs = plt.subplots(1,2)
+    from_im = im1[im_y[ins], im_x[ins]]
+    img_copy = np.zeros(im1.shape[:2])
+    img_copy[o_r, o_c] = 3
+    img_copy[im_y[ins], im_x[ins]] = 1
+    new_im_cop = np.zeros(new_img.shape[:2])
+    rmin = np.min(pts[1, :])
+    rmax = np.max(pts[1, :])
+    cmin = np.min(pts[0, :])
+    cmax = np.max(pts[0, :])
+    new_im_cop[pts[1, :], pts[0, :]] = 1
+    # new_im_cop[pts[1, :][ins], pts[0, :][ins]] = 2
+    # img_copy = (img_copy * 255).astype(np.uint8)
+    ma = np.max(img_copy)
+    mi = np.min(img_copy)
+    axs[0].imshow(img_copy)
+    axs[1].imshow(new_im_cop)
+    plt.show()
+    orr = pts[1, :]
+    print(f"or max: {np.max(orr)} and or min: {np.min(orr)}")
+    occ = pts[0, :]
+    print(f"oc max: {np.max(occ)} and oc min: {np.min(occ)}")
+    new_img[orr[ins], occ[ins]] = from_im
+    ma = np.max(new_img)
+    mi = np.min(new_img)
+    
+    first_half = np.zeros(new_img.shape)
+    first_half[off_y:im2.shape[0] + off_y, off_x:im2.shape[1] + off_x, :] = im2
+    plt.imshow(first_half)
+    plt.show()
+    # mask = np.zeros(new_img.shape[:2])
+    # mask[:, min(im2.shape[1] + off_x, xMax + off_x):] = 1
+    # ans = smooth_imgs(new_img, first_half, mask)
+    mask = first_half.astype(bool) & new_img.astype(bool)
+    weighted_img = mask.astype(float) * first_half * blend1 + mask.astype(float) * new_img * blend2 + (1 - mask.astype(float)) * new_img + (1 - mask.astype(float)) * first_half
+    ans = weighted_img
+    return ans
+
 def warpImage(im, H):
     h, w = im.shape[:2]
-    box_corners = [[0, 0], 
-                   [0, h - 1],
+    box_corners = [[0, h - 1], 
                    [w - 1, h - 1],
-                   [w - 1, 0]]
+                   [w - 1, 0],
+                   [0, 0]]
     box_arr = np.array(box_corners)
     box_arr_pts = (np.hstack([box_arr, np.ones((4, 1))]))
     print(f"box_arr_pts: {box_arr_pts}")
@@ -167,32 +303,39 @@ def warpImage(im, H):
     
     
     o_r, o_c = polygon(box_arr[:, 1], box_arr[:, 0])
-    r, c = polygon(np.squeeze(new_bounds[1, :]), np.squeeze(new_bounds[0, :]))
+    print("making polygons...")
+    r, c = polygon(new_bounds[1, :] + off_y, new_bounds[0, :] + off_x)
     # r = np.clip(np.array(r), yMin, yMax - 1)
     # c = np.clip(np.array(c), xMin, xMax - 1)
-    # r += off_y
-    # c += off_x
+    # pts_backup = pts = np.row_stack((c - 1, r - 1, np.ones(r.shape[0])))
+    r -= off_y
+    c -= off_x
     pts = np.row_stack((c, r, np.ones(r.shape[0])))
     H_inv = np.linalg.inv(H)
     pts_in_im = (H_inv @ pts)
     im_x = np.round(pts_in_im[0, :] / pts_in_im[2, :]).astype(int)
     im_y = np.round(pts_in_im[1, :] / pts_in_im[2, :]).astype(int)
-    pts[0, :] += off_x
-    pts[1, :] += off_y
-    pts = pts.astype(int)
+    pts[0, :] += off_x - 1
+    pts[1, :] += off_y - 1
+    # pts = pts_backup.astype(int)
+    pts = np.round(pts).astype(int)
     
     
-    ###not here
+    
     ins = np.where((im_y >= 0) & (im_y < im.shape[0]) & (im_x >= 0) & (im_x < im.shape[1]))
-    ###
+    
     f, axs = plt.subplots(1,2)
     from_im = im[im_y[ins], im_x[ins]]
     img_copy = np.zeros(im.shape[:2])
     img_copy[o_r, o_c] = 3
     img_copy[im_y[ins], im_x[ins]] = 1
     new_im_cop = np.zeros(new_img.shape[:2])
+    rmin = np.min(pts[1, :])
+    rmax = np.max(pts[1, :])
+    cmin = np.min(pts[0, :])
+    cmax = np.max(pts[0, :])
     new_im_cop[pts[1, :], pts[0, :]] = 1
-    new_im_cop[pts[1, :][ins], pts[0, :][ins]] = 2
+    # new_im_cop[pts[1, :][ins], pts[0, :][ins]] = 2
     # img_copy = (img_copy * 255).astype(np.uint8)
     ma = np.max(img_copy)
     mi = np.min(img_copy)
@@ -209,7 +352,7 @@ def warpImage(im, H):
     
     
     return (new_img * 255).astype(np.uint8)
-    # return (canvas * 255).astype(np.uint8)
+
 
 def predict_pt(H, pt1):
     pt2 = H @ pt1
@@ -222,11 +365,32 @@ def get_avg_dist(pts):
             pt2 = pts[j % pts.shape[0], :]
             sum_dist += np.linalg.norm(pt2 - pt1)
     return sum_dist / pts.shape[0]
+def get_best_pts(im1, im2, pts1, pts2):
+    for i in range(pts1.shape[0]):
+        pt1 = pts1[i, :]
+        pt2 = pts2[i, :]
+        best_pt1, pt2 = refine_by_ncc(im1, im2, pt1, pt2, size=13)
+        pts1[i, :] = np.array(best_pt1)
+    return pts1
 
-
+def rescale(im, size):
+    if im.shape[0] > size or im.shape[1] > size:
+        shape_max = max(im.shape[0], im.shape[1])
+        scale = size / shape_max
+        return skt.rescale(im, scale, channel_axis=2 if len(im.shape) > 2 else None, anti_aliasing=True)
+    else:
+        return im
+        
 def main():
     img_folder = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), "images")
-    im1 = skio.imread(osp.join(img_folder, "walk.png")) / 255
+    # im1_name = input("Name of img 1?: ")
+    im1_name = "IMG_0098.jpg"
+    im1_base = skio.imread(osp.join(img_folder, im1_name)) / 255
+    im1 = rescale(im1_base, SIZE)
+    to_Rec = input("rectify img? (y/n): ")
+    RECTIFY = (to_Rec == 'y' or to_Rec == 'Y')
+    
+    
     
     # points = int(input("How many points? "))
     # pts1 = np.round(np.array(get_pts(im1, points)))
@@ -237,10 +401,12 @@ def main():
         # off_y = np.min(pts1[:, 1])
         off_x = 100
         off_y = 100
-        # s = get_avg_dist(pts1)
+        s = get_avg_dist(pts1)
         # s = int(np.linalg.norm(pts1[1, :] - pts1[0, :]))
+        ul = pts1[0, :]
+        # to_add = np.array([ul, ul, ul, ul])
         # s = im1.shape[0]
-        s = 1000
+        # s = 1000
         # pts2 = np.array([[0, 0],
         #                 [0.5, 0],
         #                 [1, 0],
@@ -253,6 +419,7 @@ def main():
                         [1., 0.], #ur
                         [0., 1.],#bl
                         [1., 1.]]) * s  #br
+        # pts2 += to_add
         # pts2 = np.array([[1., 0.], #ur
         #                 [1., 1.], #br
         #                 [0., 1.],#bl
@@ -267,6 +434,7 @@ def main():
         # new_img = warp_image_rectify(im1, H)
         # new_img2 = warpImage2(im1, im1, H)
         f, axs = plt.subplots(1,2)
+        f.suptitle(f"Image rectification: {im1_name}")
         axs[0].set_title("Original Image")
         axs[0].imshow(im1)
         axs[1].set_title("Frontal Parallel Rectified Image")
@@ -274,6 +442,68 @@ def main():
         # axs[2].imshow(new_img2)
         # plt.tight_layout()
         plt.show()
+    else:
+        # im2_name = input("img 2 name?: ")
+        is_new = input("is this a new mosaic? (y/n) ") == 'y'
+        folder_name = input("enter name for mosaic ")
+        folder = osp.join(img_folder, folder_name)
+        data_file = osp.join(folder, "data.json")
+        ims = {}
+        pts = {}
+        data = {}
+        prev_im_name = ""
+        repeat = True
+        first_pass = True
+        sum_img = []
+        while repeat:
+            im_name = input("name of img? ")
+            im = skio.imread(osp.join(img_folder, im_name)) / 255
+            im = rescale(im, SIZE)
+            ims[osp.join(img_folder, im_name)] = im
+            if first_pass:
+                first_pass = False
+                sum_img = im
+                continue
+            else:
+                num_pts = int(input("How many points?: "))
+                pts1, pts2 = get_corr_pts(sum_img, im, num_pts=num_pts)
+                pts1 = np.round(pts1).astype(int)
+                pts2 = np.round(pts2).astype(int)
+                # pts1 = get_best_pts(sum_img, im, pts1, pts2)
+                
+                H = computeH(pts1, pts2)
+                sum_img = warp_images(sum_img, im, H)
+            repeat = input("add another img (y/n)") == 'y'
+        
+       
+        
+        plt.title(f"Mosiac for {folder_name}")
+        plt.imshow(sum_img)
+        plt.show()
+                
+                
+                
+                
+        # im2_name = "IMG_0097.jpg"
+        # im2_base = skio.imread(osp.join(img_folder, im2_name)) / 255
+        # im2 = rescale(im2_base, SIZE)
+        # num_pts = int(input("How many points?: "))
+        # pts1 = np.round(np.array(get_pts(im1, num_pts))).astype(int)
+        # pts2 = np.round(np.array(get_pts(im2, num_pts))).astype(int)
+        # H = computeH(pts1, pts2)
+        # new_img = warp_images(im1, im2, H)
+        # f, axs = plt.subplots(1,3)
+        # f.suptitle(f"Mosiac with: {im1_name} and {im2_name}")
+        # axs[0].set_title("Image 1")
+        # axs[0].imshow(im1)
+        # axs[1].set_title("Mosaic")
+        # axs[1].imshow(new_img)
+        # axs[2].set_title("Image 2")
+        # axs[2].imshow(im2)
+        # axs[2].imshow(new_img2)
+        # plt.tight_layout()
+        # plt.show()     
+        
         
     # im2 = ...
     # pts2 = get_pts(im2, points)

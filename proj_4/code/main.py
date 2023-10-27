@@ -401,8 +401,40 @@ def filter_harris_pts(h: np.array, coords: np.array, num_pts: int) -> np.array:
     
     top_vals = coords[:, np.argsort(h_vals)[::-1]]
     return top_vals       
-def anms(h, coords, num_pts):
-    return
+def anms(h: np.array, coords: np.array, num_pts: int, is_desc_order=False):
+    """Takes in a list of coords in descending order and output coords
+    based on Adaptive Non-maximal Suppression
+
+    Args:
+        h (np.array): mapping of H intensity in im 
+        coords (np.array): _description_
+        num_pts (int): _description_
+    """
+    
+    pts = np.ones(coords.shape[1])
+    pts *= float('inf')
+    if is_desc_order:
+        for i in range(pts.shape[0]):
+            main_pt = coords[:, i]
+            for j in range(i + 1):
+                comp_pt = coords[:, j]
+                if h[comp_pt] > h[main_pt]:
+                    dist = np.linalg.norm(main_pt - comp_pt)
+                    if dist < pts[i]:
+                        pts[i] = dist
+                    
+    else:       
+        for i in range(pts.shape[0]):
+            main_pt = coords[:, i]
+            for j in range(pts.shape[0]):
+                comp_pt = coords[:, j]
+                if h[comp_pt] > h[main_pt]:
+                    dist = np.linalg.norm(main_pt - comp_pt)
+                    if dist < pts[i]:
+                        pts[i] = dist
+        pts = np.sort(pts)
+        
+    return pts
     
 def main():
     img_folder = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), "images")

@@ -12,9 +12,12 @@ import json
 import pickle
 from pro2_main import gauss_stack, laplace_stack, blend, plot_pyramids, smooth_imgs
 import cv2
+from harris import get_harris_corners
+import heapq
 #Global
 MAX_WORKERS = 7
 RECTIFY = True
+MOSAIC = True
 SIZE = 864
 def computeH(pts1, pts2) -> np.array:
     """Return homography matrix that maps pts1 to pts 2
@@ -380,7 +383,27 @@ def rescale(im, size):
         return skt.rescale(im, scale, channel_axis=2 if len(im.shape) > 2 else None, anti_aliasing=True)
     else:
         return im
-        
+
+def filter_harris_pts(h: np.array, coords: np.array, num_pts: int) -> np.array:
+    """Returns the number harris corners based on h intensity to the amount NUM_PTS
+
+    Args:
+        h (np.array): mapping of H intensity in im
+        coords (np.array): points of all harris corners
+        num_pts (int): number of points to filter coords down to, must be less than
+        size of coords
+
+    Returns:
+        np.array: coords filtered to NUM_PTS by highest H intensity
+    """
+    assert num_pts <= coords.shape[1]
+    h_vals = h[coords[0], coords[1]]
+    
+    top_vals = coords[:, np.argsort(h_vals)[::-1]]
+    return top_vals       
+def anms(h, coords, num_pts):
+    return
+    
 def main():
     img_folder = osp.join(osp.dirname(osp.dirname(osp.abspath(__file__))), "images")
     # im1_name = input("Name of img 1?: ")
@@ -442,7 +465,7 @@ def main():
         # axs[2].imshow(new_img2)
         # plt.tight_layout()
         plt.show()
-    else:
+    if MOSAIC:
         # im2_name = input("img 2 name?: ")
         is_new = input("is this a new mosaic? (y/n) ") == 'y'
         folder_name = input("enter name for mosaic ")
@@ -480,7 +503,45 @@ def main():
         plt.title(f"Mosiac for {folder_name}")
         plt.imshow(sum_img)
         plt.show()
+    
+    else:
+        # im2_name = input("img 2 name?: ")
+        # is_new = input("is this a new mosaic? (y/n) ") == 'y'
+        # folder_name = input("enter name for mosaic ")
+        # folder = osp.join(img_folder, folder_name)
+        # data_file = osp.join(folder, "data.json")
+        ims = {}
+        pts = {}
+        data = {}
+        prev_im_name = ""
+        repeat = True
+        first_pass = True
+        sum_img = []
+        while repeat:
+            im_name = input("name of img? ")
+            im = skio.imread(osp.join(img_folder, im_name)) / 255
+            im = rescale(im, SIZE)
+            ims[osp.join(img_folder, im_name)] = im
+            if first_pass:
+                first_pass = False
+                sum_img = im
+                continue
+            else:
+                h, coords = get_harris_corners(im)
+                if coords.shape[1] > 1000:
+                    coords = filter_harris_pts(h, coords, 1000)
                 
+                # pts1 = get_best_pts(sum_img, im, pts1, pts2)
+                
+                H = computeH(pts1, pts2)
+                sum_img = warp_images(sum_img, im, H)
+            repeat = input("add another img (y/n)") == 'y'
+        
+       
+        
+        plt.title(f"Mosiac for {folder_name}")
+        plt.imshow(sum_img)
+        plt.show()
                 
                 
                 

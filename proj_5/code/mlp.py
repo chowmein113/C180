@@ -73,13 +73,19 @@ class NeRF(object):
         
         #Calculate loss
         mse = loss.item()
-        curr_psnr = self.psnr(mse)
-        np.append(self.psnrs, curr_psnr.cpu().float())
+        
         return
     def pred(self, coords):
-        return self.model(coords)
+        predict = self.model(coords)
+        return predict
         
-        
+    def test(self, coords, actual_colors):
+        pred = self.pred(coords)
+        loss = self.criterion(pred, actual_colors)
+        mse = loss.item()
+        np.append(self.psnrs, self.psnr(mse))
+        return pred
+          
         
     
     

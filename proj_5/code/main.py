@@ -35,6 +35,20 @@ def pred_img(img, model):
     r, c = polygon(pts[:, 0], pts[:, 1])
     coords = np.array([r, c]).T
     canvas[coords[:, 0], coords[:, 1]] = model.pred(coords)
+    return canvas
+def test(img, model: NeRF):
+    height, width = img.shape[:2]
+    
+    canvas = np.zeros(img)
+    #corners in r, c
+    pts = np.array([[0, 0],
+                    [height - 1, 0],
+                    [0, width - 1],
+                    [height - 1, width - 1]])
+    r, c = polygon(pts[:, 0], pts[:, 1])
+    coords = np.array([r, c]).T
+    canvas[coords[:, 0], coords[:, 1]] = model.test(coords, img[coords[:, 0], coords[:, 1]])
+    return canvas
     
     
     
@@ -53,6 +67,7 @@ def main():
     
     nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf.pth"))
     #metrics
+    pred = test(img1, nerf)
     psnrs = nerf.get_psnrs()
     
     f, axs = plt.subplots(1, 2, figsize=(10, 10))
@@ -60,8 +75,8 @@ def main():
     axs[0].plot(range(len(psnrs)), psnrs)
     axs[0].set_title("PNSRS over train iterations")
     
-    pred = pred_img(img1, nerf)
-    
+    pred = test(img1, nerf)
+    # psnr = nerf.get_psnrs()
     axs[1].imshow(pred)
     axs[1].set_title("Regenerated image")
     plt.show()

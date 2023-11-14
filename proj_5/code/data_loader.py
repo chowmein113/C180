@@ -83,7 +83,7 @@ class ImageDataLoader(object):
         img_loader = DataLoader(img_dataset, batch_size=1, shuffle=True)
         self.dataloaders.append(img_loader)
     def add_dataset(self, dataset: ImageDataSet):
-        img_loader = DataLoader(dataset, batch_size=10000, shuffle=False)
+        img_loader = DataLoader(dataset, batch_size=1, shuffle=False)
         self.dataloaders.append(img_loader)
     def __len__(self):
         return len(self.dataloaders)

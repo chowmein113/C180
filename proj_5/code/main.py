@@ -76,7 +76,7 @@ def test(img, model: NeRF):
     #     flattened_goal_colors = tcolors.squeeze(0)
     #     val = model.test(flattened_coords, flattened_goal_colors)
     #     canvas[coords[i, 0], coords[i, 1]] = val.cpu().float()
-    dataset = ImageDataSet(img, height * width)
+    dataset = ImageDataSet(img, 10000)
     model.get_img_data_loader().add_dataset(dataset)
     for coords, goal_colors in tqdm(model.get_img_data_loader().get_data_loader(-1), "Testing..."):
         tcoords = coords.to(model.device)
@@ -84,15 +84,15 @@ def test(img, model: NeRF):
         flattened_coords = tcoords.squeeze(0)
         flattened_goal_colors = tcolors.squeeze(0)
         val = model.test(flattened_coords, flattened_goal_colors)
-        coords = coords.numpy()[0]
-        coords[:, 0] = coords[:, 0] * height
-        coords[:, 1] = coords[:, 1] * width
+        coords = coords.numpy()[0] #coords in (x, y) format
+        coords[:, 1] = coords[:, 1] * (height - 1)
+        coords[:, 0] = coords[:, 0] * (width - 1)
         coords = np.round(coords).astype(int)
         m1 = np.min(coords[:, 0])
         M1 = np.max(coords[:, 0])
         m2 = np.min(coords[:, 1])
         M2 = np.max(coords[:, 1])
-        canvas[coords[:, 0], coords[:, 1]] = val.cpu().float()
+        canvas[coords[:, 1], coords[:, 0]] = val.cpu().float()
     f, axs = plt.subplots(1,2)
     f.suptitle("Where was canvas changed")
     axs[0].imshow(canvas)
@@ -115,7 +115,12 @@ def model_process(data_queue, result_queue, model: NeRF):
     
     
 def main():
-    nerf = NeRF(layers=6, learning_rate=1e-3)
+    ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
+    # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
+    EPOCH = 3000
+    LAYERS = 8
+    LEARNING_RATE = 1e-3
+    nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
     data_loader = nerf.get_img_data_loader()
     img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
     img1_pth = osp.join(img_folder, "beany.jpg")
@@ -126,25 +131,32 @@ def main():
     
     
     #train
-    train(nerf, 3000)
+    train(nerf, EPOCH)
     
     nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf.pth"))
     #metrics
+    train_psnrs = nerf.get_psnrs()[:]
+    nerf.psnrs = []
     pred = test(img1, nerf)
     psnrs = nerf.get_psnrs()
     plt.imshow(img1)
     plt.show()
-    f, axs = plt.subplots(1, 2, figsize=(10, 10))
-    f.suptitle("PNSRS and Image test")
-    axs[0].plot(range(len(psnrs)), psnrs)
-    axs[0].set_title("PNSRS over train iterations")
+    f, axs = plt.subplots(2, 2, figsize=(10, 10))
+    f.suptitle(f"PNSRS and Image test w/ num_layers: {LAYERS}, " \
+            + f"learning rate: {LEARNING_RATE}, epochs: {EPOCH}")
+    axs[0, 0].plot(range(len(train_psnrs)), train_psnrs)
+    axs[0, 0].set_title("PNSRS over train iterations")
     
-    pred = test(img1, nerf)
+    # pred = test(img1, nerf)
     # psnr = nerf.get_psnrs()
     m = np.min(pred)
     M = np.max(pred)
-    axs[1].imshow(np.round(pred * 255).astype(np.uint8))
-    axs[1].set_title("Regenerated image")
+    axs[0, 1].imshow(np.round(pred * 255).astype(np.uint8))
+    axs[0, 1].set_title("Regenerated image")
+    axs[1, 0].imshow(img1)
+    axs[1, 0].set_title("Original image")
+    axs[1, 1].plot(range(len(psnrs)), psnrs)
+    axs[1, 1].set_title("psnrs during test")
     plt.show()
     return
 if __name__ == "__main__":

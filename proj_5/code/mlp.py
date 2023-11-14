@@ -64,6 +64,7 @@ class NeRF(object):
         #save model weights
         torch.save(self.model.state_dict(), pth)
         return
+    
     def train(self, coords, actual_colors):
         #forward
         coords = coords.to(self.device)

@@ -24,6 +24,22 @@ def train(model: NeRF, num_iterations: int):
             flattened_coords = coords.squeeze(0)
             flattened_goal_colors = goal_colors.squeeze(0)
             model.train(flattened_coords, flattened_goal_colors)
+
+def transform_c2w(c2w: torch.tensor, x_c: torch.tensor) -> torch.tensor:
+    trans = torch.matmul(c2w, x_c)
+    assert(torch.equal(x_c, torch.matmul(torch.inverse(c2w), torch.matmul(c2w, x_c))))
+    return trans
+def pixel_to_camera(K: torch.tensor, uv: torch.tensor, s: float) -> torch.tensor:
+    x_c = torch.matmul(torch.inverse(K), s * uv)
+    return x_c
+def pixel_to_ray(K: torch.tensor, c2w: torch.tensor, uv: torch.tensor) -> tuple[torch.tensor]:
+    R = K[:3, :3]
+    t = K[:3, 3]
+    r0: torch.tensor = -1 * torch.matmul(torch.inverse(R), t)
+    x_c = pixel_to_camera(K, uv, 1)
+    x_w = transform_c2w(c2w, x_c)
+    rd: torch.tensor = (x_w - r0) / torch.norm(x_w - r0)
+    return r0, rd
 @torch.no_grad()           
 def pred_img(img, model):
     height, width = img.shape[:2]

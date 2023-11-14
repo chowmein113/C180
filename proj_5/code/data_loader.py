@@ -80,7 +80,7 @@ class ImageDataLoader(object):
     
     def add_img(self, img: np.array):
         img_dataset = RandomImageDataSet(img, self.sample_size)
-        img_loader = DataLoader(img_dataset, batch_size=1, shuffle=True, num_workers=4)
+        img_loader = DataLoader(img_dataset, batch_size=1, shuffle=True)
         self.dataloaders.append(img_loader)
     def add_dataset(self, dataset: ImageDataSet):
         img_loader = DataLoader(dataset, batch_size=10000, shuffle=False)

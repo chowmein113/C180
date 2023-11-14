@@ -19,16 +19,14 @@ def train(model: NeRF, num_iterations: int):
     psnr = 0.0
     for i in tqdm(range(num_iterations), "Training Model..."):
         #batch
-        for idx, data in tqdm(enumerate(data_loader), "batch..."):
+        for data in tqdm(data_loader, "batch..."):
             coords, goal_colors = data
             #flatten batch
             flattened_coords = coords.squeeze(0)
             flattened_goal_colors = goal_colors.squeeze(0)
             model.train(flattened_coords, flattened_goal_colors)
             psnr += model.get_psnrs()[-1]
-            if idx % 50 == 0:
-                print(f"psnr {idx}: {model.get_psnrs()[-1]}")
-                psnr = 0.0
+            
         print(f"psnr final {i}: {psnr}")
         psnr = 0.0
 

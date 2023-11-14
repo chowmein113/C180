@@ -133,7 +133,7 @@ def main():
     #train
     train(nerf, EPOCH)
     
-    nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf.pth"))
+    nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", f"mlp_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.pth"))
     #metrics
     train_psnrs = nerf.get_psnrs()[:]
     nerf.psnrs = []

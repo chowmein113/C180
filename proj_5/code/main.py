@@ -16,14 +16,20 @@ def load_img(path: str) -> np.array:
     return img
 def train(model: NeRF, num_iterations: int):
     data_loader = model.get_img_data_loader().get_data_loader(0)
-    for _ in tqdm(range(num_iterations), "Training Model..."):
+    psnr = 0.0
+    for i in tqdm(range(num_iterations), "Training Model..."):
         #batch
-        for idx, data in tqdm(enumerate(data_loader), "batch..."):
+        for i, data in tqdm(enumerate(data_loader), "batch..."):
             coords, goal_colors = data
             #flatten batch
             flattened_coords = coords.squeeze(0)
             flattened_goal_colors = goal_colors.squeeze(0)
             model.train(flattened_coords, flattened_goal_colors)
+            psnr += model.get_psnrs()[-1]
+            if i % 50 == 0:
+                print(f"psnr {i}: {model.get_psnrs()[-1]}")
+                psnr = 0.0
+        # print(f"psnr {i}: {model.get_psnrs()[-1]}")
 
 def transform_c2w(c2w: torch.tensor, x_c: torch.tensor) -> torch.tensor:
     trans = torch.matmul(c2w, x_c)
@@ -110,11 +116,13 @@ def model_process(data_queue, result_queue, model: NeRF):
     
     
 def main():
-    nerf = NeRF()
+    nerf = NeRF(layers=6, learning_rate=1e-3)
     data_loader = nerf.get_img_data_loader()
     img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
     img1_pth = osp.join(img_folder, "beany.jpg")
     img1 = load_img(img1_pth)
+    m=np.min(img1)
+    M=np.max(img1)
     data_loader.add_img(img1)
     
     

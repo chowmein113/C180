@@ -14,7 +14,13 @@ def positional_encoding(x, L=10):
         for fn in [torch.sin, torch.cos]:
             pe.append(fn(2. ** i * x))
     return torch.cat(pe, dim=-1)
-
+class PositionalEncoder(nn.Module):
+    def __init__(self, L=10):
+        super(PositionalEncoder, self).__init__()
+        self.L = L
+    
+    def forward(self, x):
+        return positional_encoding(x, self.L)
 class MLP(nn.Module):
     def __init__(self, num_layers: int = 4, L: int = 10, hidden_size: int = 256):
         super().__init__()
@@ -24,7 +30,7 @@ class MLP(nn.Module):
         self.L = L
         
         input_dims = 2 * (2 * self.L + 1)
-        layers = [nn.Linear(input_dims, hidden_size), nn.ReLU()]
+        layers = [PositionalEncoder(L=self.L), nn.Linear(input_dims, hidden_size), nn.ReLU()]
         for _ in range(num_layers - 2):
             layers.extend([nn.Linear(hidden_size, hidden_size), nn.ReLU()])
         layers.extend([nn.Linear(hidden_size, 3), nn.Sigmoid()])  # Output RGB
@@ -32,8 +38,7 @@ class MLP(nn.Module):
         self.layers = nn.Sequential(*layers)
 
     def forward(self, coords):
-        pe_coords = positional_encoding(coords, L=self.L)
-        return self.layers(pe_coords)
+        return self.layers(coords)
 class NeRF(object):
     def __init__(self, layers: int = 4, L: int = 10, learning_rate: float = 1e-2, gpu_id: int = 0, pth: str = ""):
         
@@ -69,16 +74,19 @@ class NeRF(object):
         #forward
         coords = coords.to(self.device)
         actual_colors = actual_colors.to(self.device)
-        self.optimizer.zero_grad()
+        # self.optimizer.zero_grad()
         pred = self.model(coords)
         loss = self.criterion(pred, actual_colors)
-        
+        self.optimizer.zero_grad()
         #back propagation
         loss.backward()
         self.optimizer.step()
         
         #Calculate loss
         mse = loss.item()
+        
+        psnr = self.psnr(mse)
+        self.psnrs.append(psnr.cpu().item())
         
         return
     @torch.no_grad()

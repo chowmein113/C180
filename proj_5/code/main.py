@@ -118,8 +118,8 @@ def main():
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
     # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
     EPOCH = 1500
-    LAYERS = 8
-    LEARNING_RATE = 1e-2
+    LAYERS = 4
+    LEARNING_RATE = 1e-3
     nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
     data_loader = nerf.get_img_data_loader()
     img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
@@ -157,8 +157,8 @@ def main():
     axs[1, 0].set_title("Original image")
     axs[1, 1].plot(range(len(psnrs)), psnrs)
     axs[1, 1].set_title("psnrs during test")
-    # plt.show()
-    plt.savefig(osp.join(img_folder, f"mlp_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.png"))
+    plt.show()
+    # plt.savefig(osp.join(img_folder, f"mlp_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.png"))
     return
 if __name__ == "__main__":
     main()

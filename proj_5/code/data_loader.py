@@ -1,6 +1,8 @@
 import torch
 from torch.utils.data import Dataset, DataLoader
 import numpy as np
+from tools import *
+import multiprocessing
 class TrainImageDataSet(Dataset):
     def __init__(self, image: np.array, num_sample: float):
         self.image = image
@@ -71,7 +73,46 @@ class RandomImageDataSet(ImageDataSet):
     #     norm_coord = self.normalize_coords(img_coord)
     #     clr = self.image[img_coord[1], img_coord[0]] / 255.0
     #     return torch.from_numpy(norm_coord).float(), torch.from_numpy(clr).float()
+class NerfDataSet(Dataset):
+    def __init__(self, data: np.array, num_samples: int, num_workers: int, K, c2w,):
+        self.num_samples = num_samples
+        self.camera_pixel_pairs = None
+        self.num_workers = num_workers
+        #make pixel camera pairs
+        for i in range(data.shape[0]):
+            self.add_flattened_data(data, i)
+        #make rays from these pairs
+        # split pairs into chunks
+        # multi process and turn into rays
+        def camera_pixel_to_ray(pixel_pair: np.array):
+            r0, rd = pixel_to_ray
+        with multiprocessing.Pool(multiprocessing.cpu_count()) as pool:
+            results = pool.map(pixel)
         
+        
+        
+    def add_flattened_data(self, data: np.array, camera: int):
+        image = data[camera]
+        coords = np.indices(image.shape[:2]).reshape(2, -1).T #(r, c) form
+        coords = coords[:, ::-1] #(r, c) -> (x, y) or (u, v) format
+        cam_num = np.zeros((coords.shape[0], 1))
+        cam_num += camera
+        coords = np.hstack((cam_num, coords))
+        if self.camera_pixel_pairs is None:
+            self.camera_pixel_pairs = coords
+        else:
+            np.append(self.camera_pixel_pairs, coords)
+        return
+    def __len__(self):
+        return self.camera_pixel_pairs.shape[0] // self.num_samples if self.camera_pixel_pairs is not None else 0
+    
+    def __getitem__(self, idx):
+        if self.camera_pixel_pairs is None:
+            return None
+        end = min(self.camera_pixel_pairs.shape[0], (idx + 1) * self.num_samples)
+        sample = self.camera_pixel_pairs[idx: end]
+        return sample
+    
 class ImageDataLoader(object):
     def __init__(self, sample_size: int = 10):
         self.sample_size = sample_size
@@ -89,5 +130,4 @@ class ImageDataLoader(object):
         return len(self.dataloaders)
     def get_data_loader(self, idx):
         return self.dataloaders[idx]
-    def add_data_set(self, dataset):
-        self.dataloaders.append(dataset)
+    

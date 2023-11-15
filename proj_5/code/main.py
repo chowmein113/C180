@@ -1,16 +1,15 @@
 from mlp import NeRF
-from scipy.ndimage import shift, map_coordinates
-import skimage.io as skio
-import skimage.transform as skt
-from skimage.draw import polygon
-from skimage import color
+# from scipy.ndimage import shift, map_coordinates
 from tqdm import tqdm
-import os
+# import os
 import os.path as osp
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from data_loader import ImageDataSet
+from data_loader import ImageDataSet, NerfDataSet
+
+PART_1 = False
+PART_2 = True
 def load_img(path: str) -> np.array:
     img = skio.imread(path) / 255.0
     return img
@@ -30,35 +29,8 @@ def train(model: NeRF, num_iterations: int):
         print(f"psnr final {i}: {psnr}")
         psnr = 0.0
 
-def transform_c2w(c2w: torch.tensor, x_c: torch.tensor) -> torch.tensor:
-    trans = torch.matmul(c2w, x_c)
-    assert(torch.equal(x_c, torch.matmul(torch.inverse(c2w), torch.matmul(c2w, x_c))))
-    return trans
-def pixel_to_camera(K: torch.tensor, uv: torch.tensor, s: float) -> torch.tensor:
-    x_c = torch.matmul(torch.inverse(K), s * uv)
-    return x_c
-def pixel_to_ray(K: torch.tensor, c2w: torch.tensor, uv: torch.tensor) -> tuple[torch.tensor]:
-    R = K[:3, :3]
-    t = K[:3, 3]
-    r0: torch.tensor = -1 * torch.matmul(torch.inverse(R), t)
-    x_c = pixel_to_camera(K, uv, 1)
-    x_w = transform_c2w(c2w, x_c)
-    rd: torch.tensor = (x_w - r0) / torch.norm(x_w - r0)
-    return r0, rd
-@torch.no_grad()           
-def pred_img(img, model):
-    height, width = img.shape[:2]
-    
-    canvas = np.zeros(img.shape)
-    #corners in r, c
-    pts = np.array([[0, 0],
-                    [height - 1, 0],
-                    [0, width - 1],
-                    [height - 1, width - 1]])
-    r, c = polygon(pts[:, 0], pts[:, 1])
-    coords = np.array([r, c]).T
-    canvas[coords[:, 0], coords[:, 1]] = model.pred(coords)
-    return canvas
+
+
 @torch.no_grad()
 def test(img, model: NeRF):
     
@@ -113,8 +85,7 @@ def model_process(data_queue, result_queue, model: NeRF):
             result = model.pred(input_parm)
             result_queue.put(result.cpu()) 
     
-    
-def main():
+def part_1():
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
     # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
     EPOCH = 1500
@@ -159,7 +130,59 @@ def main():
     axs[1, 1].set_title("psnrs during test")
     plt.show()
     # plt.savefig(osp.join(img_folder, f"mlp_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.png"))
-    return
+#     return  
+# def train_nerf(epoch: int, model: NeRF, c2ws_train, focal):
+#     dataloader = model.get_img_data_loader().get_data_loader(-1)
+    
+#     for i in tqdm(range(epoch), "Training rays: "):
+#         for batch in tqdm(dataloader, "Processing Batch: "):
+            
+        
+def part_2():
+    data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
+    data = np.load(osp.join(data_dir, "lego_200x200.npz"))
+
+    # Training images: [100, 200, 200, 3]
+    images_train = data["images_train"] / 255.0
+
+    # Cameras for the training images 
+    # (camera-to-world transformation matrix): [100, 4, 4]
+    c2ws_train = data["c2ws_train"]
+
+    # Validation images: 
+    images_val = data["images_val"] / 255.0
+
+    # Cameras for the validation images: [10, 4, 4]
+    # (camera-to-world transformation matrix): [10, 200, 200, 3]
+    c2ws_val = data["c2ws_val"]
+
+    # Test cameras for novel-view video rendering: 
+    # (camera-to-world transformation matrix): [60, 4, 4]
+    c2ws_test = data["c2ws_test"]
+
+    # Camera focal length
+    focal = data["focal"]  # float
+    
+    ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
+    # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
+    EPOCH = 1500
+    LAYERS = 4
+    LEARNING_RATE = 1e-3
+    nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
+    dataset = NerfDataSet(images_train, 1000)
+    nerf.get_img_data_loader().add_dataset(dataset)
+    
+    
+    
+    
+    
+def main():
+    if PART_1:
+        part_1()
+    if PART_2:
+        part_2()
+    
+    
 if __name__ == "__main__":
     main()
 

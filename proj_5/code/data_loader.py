@@ -102,13 +102,13 @@ def worker_camera_pixels_to_rays(pixel_pairs: torch.Tensor, shared_tensor: torch
         lst.append(camera_pixel_to_ray(pixel_pair, c2w, K))
     result = torch.from_numpy(np.array(lst))
     end = min(shared_tensor.size(0), (i + 1) * chunk_size)
-    shared_tensor[i:end] = result
+    shared_tensor[i * chunk_size:end, :, :] = result
     return
 class NerfDataSet(Dataset):
     def __init__(self, data: np.array, num_samples: int, 
                  num_workers: int, f: float, c2w: np.array, 
                  im_height  = None, im_width = None):
-        self.workers = 8
+        self.workers = min(multiprocessing.cpu_count(), num_workers)
         self.num_samples = num_samples
         self.camera_pixel_pairs = None
         self.num_workers = num_workers
@@ -140,8 +140,8 @@ class NerfDataSet(Dataset):
         for p in processes:
             p.join()
         
-            
-        self.ray_color_pairs: torch.Tensor = result_tensor
+        shuffle_indices = torch.randperm(result_tensor.size(0))
+        self.ray_color_pairs: torch.Tensor = result_tensor[shuffle_indices, :, :]
         del self.camera_pixel_pairs
         #make rays from these pairs
         # split pairs into chunks
@@ -201,7 +201,7 @@ class NerfDataSet(Dataset):
         if self.ray_color_pairs is None:
             return None
         end = min(len(self.ray_color_pairs), (idx + 1) * self.num_samples)
-        sample = self.ray_color_pairs[idx: end]
+        sample = self.ray_color_pairs[idx * self.num_samples: end]
         #TODO: figure out how to grab sample with rays AND color for each pixel while having a good batch load
         return sample
 class NerfSingularDataSet(Dataset):

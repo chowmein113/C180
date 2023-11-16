@@ -355,25 +355,28 @@ def part_2():
     
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
     # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
-    EPOCH = 1000
+    EPOCH = 10
     LAYERS = 8
     LEARNING_RATE = 5e-4
     mp.set_start_method('spawn')
     nerf = DeepNeRF(learning_rate=LEARNING_RATE)
     # dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
-    dataset = NerfDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    dataset = NerfDataSet(data=images_train, num_samples=10000, num_workers = multiprocessing.cpu_count(), f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
     psnr = 0.0
     for i in tqdm(range(EPOCH), "Training iteration:"):
-        for batch in tqdm(dataloader, "Going through batch"):
+        for idx, batch in enumerate(tqdm(dataloader, "Going through batch")):
             # rays_o = batch[:, 1:, 0].numpy()
             # rays_d = batch[:, 1:, 1].numpy()
+            batch = batch[0]
             actual_colors = batch[:, 1:, 2].float()
             points = sample_along_rays(batch, near=2.0, far=6.0, samples=64, perturb=True, with_rays=True)
             coords = torch.from_numpy(points[:, :3]).float()
             ray_ds = torch.from_numpy(points[:, 3:]).float()
             nerf.train(coords, ray_ds, actual_colors)
             psnr += nerf.get_psnrs()[-1]
+            if idx % 20 == 0:
+               print(f"psnr current {idx}: {psnr}") 
         print(f"psnr final {i}: {psnr}")
         psnr = 0.0
 
@@ -383,7 +386,7 @@ def part_2():
     # calibrate_volume()
     nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", f"deep_nerf_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.pth"))
     #metrics
-    train_psnrs = nerf.get_psnrs()[:]
+    train_psnrs = nerf.get_psnrs()
     nerf.psnrs = []
     # pred = test(img1, nerf)
     psnrs = nerf.get_psnrs()

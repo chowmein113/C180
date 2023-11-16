@@ -107,6 +107,7 @@ class NeRF(object):
         
         
         device = torch.device("cuda:{}".format(gpu_id) if torch.cuda.is_available() else "cpu")
+        print("cuda:{}".format(gpu_id) if torch.cuda.is_available() else "cpu")
         self.device = device
         self.model = MLP(num_layers=layers, L = L)
     

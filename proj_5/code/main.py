@@ -1,13 +1,15 @@
-from mlp import NeRF
+from mlp import NeRF, DeepNeRF
 # from scipy.ndimage import shift, map_coordinates
 from tqdm import tqdm
 # import os
 import os.path as osp
+from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from data_loader import ImageDataSet, NerfDataSet
-
+from data_loader import ImageDataSet, NerfDataSet, NerfSingularDataSet
+import skimage.io as skio
+from tools import *
 PART_1 = False
 PART_2 = True
 def load_img(path: str) -> np.array:
@@ -136,9 +138,7 @@ def part_1():
     
 #     for i in tqdm(range(epoch), "Training rays: "):
 #         for batch in tqdm(dataloader, "Processing Batch: "):
-            
-        
-def part_2():
+def calibrate_part1():
     data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
     data = np.load(osp.join(data_dir, "lego_200x200.npz"))
 
@@ -169,8 +169,236 @@ def part_2():
     LAYERS = 4
     LEARNING_RATE = 1e-3
     nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
-    dataset = NerfDataSet(images_train, 1000)
-    nerf.get_img_data_loader().add_dataset(dataset)
+    dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    # dataloader = nerf.get_img_data_loader().add_dataset(dataset)
+    import viser, time  # pip install viser
+    # import numpy as np
+
+    # --- You Need to Implement These ------
+    # dataset = RaysData(images_train, K, c2ws_train)
+    ray_color_tensors = dataset.sample_rays(100)
+    # rays_o, rays_d, pixels = dataset.sample_rays(100) # Should expect (B, 3)
+    rays_o = ray_color_tensors[:, 1:, 0].numpy()
+    rays_d = ray_color_tensors[:, 1:, 1].numpy()
+    
+    
+    points = sample_along_rays(ray_color_tensors, near=2.0, far=6.0, samples=32, perturb=True)
+    H, W = images_train.shape[1:3]
+    K = intrinsic_K(focal, H, W)
+    # ---------------------------------------
+
+    server = viser.ViserServer(share=True)
+    for i, (image, c2w) in enumerate(zip(images_train, c2ws_train)):
+        server.add_camera_frustum(
+            f"/cameras/{i}",
+            fov=2 * np.arctan2(H / 2, K[0, 0]),
+            aspect=W / H,
+            scale=0.15,
+            wxyz=viser.transforms.SO3.from_matrix(c2w[:3, :3]).wxyz,
+            position=c2w[:3, 3],
+            image=image
+        )
+    for i, (o, d) in enumerate(zip(rays_o, rays_d)):
+        server.add_spline_catmull_rom(
+            f"/rays/{i}", positions=np.stack((o, o + d * 6.0)),
+        )
+    server.add_point_cloud(
+        f"/samples",
+        colors=np.zeros_like(points).reshape(-1, 3),
+        points=points.reshape(-1, 3),
+        point_size=0.02,
+    )
+    time.sleep(1000)  
+def calibrate_part2():   
+    data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
+    data = np.load(osp.join(data_dir, "lego_200x200.npz"))
+
+    # Training images: [100, 200, 200, 3]
+    images_train = data["images_train"] / 255.0
+
+    # Cameras for the training images 
+    # (camera-to-world transformation matrix): [100, 4, 4]
+    c2ws_train = data["c2ws_train"]
+
+    # Validation images: 
+    images_val = data["images_val"] / 255.0
+
+    # Cameras for the validation images: [10, 4, 4]
+    # (camera-to-world transformation matrix): [10, 200, 200, 3]
+    c2ws_val = data["c2ws_val"]
+
+    # Test cameras for novel-view video rendering: 
+    # (camera-to-world transformation matrix): [60, 4, 4]
+    c2ws_test = data["c2ws_test"]
+
+    # Camera focal length
+    focal = data["focal"]  # float
+    
+    ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
+    # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
+    EPOCH = 1500
+    LAYERS = 4
+    LEARNING_RATE = 1e-3
+    nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
+    dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)  
+    # Visualize Cameras, Rays and Samples
+    import viser, time
+    # import numpy as np
+
+    # --- You Need to Implement These ------
+    # dataset = RaysData(images_train, K, c2ws_train)
+
+    
+    
+    # # Uncoment this to display random rays from the first image
+    indices = np.random.randint(low=0, high=40_000, size=100)
+
+    # # Uncomment this to display random rays from the top left corner of the image
+    # indices_x = np.random.randint(low=100, high=200, size=100)
+    # indices_y = np.random.randint(low=0, high=100, size=100)
+    # indices = indices_x + (indices_y * 200)
+    
+    ray_color_tensors = dataset.get_rays_by_idx(indices)
+    # rays_o, rays_d, pixels = dataset.sample_rays(100) # Should expect (B, 3)
+    rays_o = ray_color_tensors[:, 1:, 0].numpy()
+    rays_d = ray_color_tensors[:, 1:, 1].numpy()
+    pixels = ray_color_tensors[:, 1:, 2].numpy()
+    
+    # This will check that your uvs aren't flipped
+    uvs_start = 0
+    uvs_end = 40_000
+    assert dataset.camera_pixel_pairs is not None
+    # sample_uvs = np.round((dataset.camera_pixel_pairs[uvs_start:uvs_end, 1:3] - 0.5).numpy()).astype(int) # These are integer coordinates of widths / heights (xy not yx) of all the pixels in an image
+    # uvs are array of xy coordinates, so we need to index into the 0th image tensor with [0, height, width], so we need to index with uv[:,1] and then uv[:,0]
+    # pixels = dataset.camera_pixel_pairs[uvs_start:uvs_end, 3:]
+    # for i, sample_uv in enumerate(sample_uvs):
+    #     img = images_train[0]
+    #     gen_pixel = img[sample_uv[1], sample_uv[0]]
+    #     gen_pixel = images_train[0, sample_uv[1], sample_uv[0]]
+    #     pixel = pixels[i]
+    #     assert np.isclose(gen_pixel, pixel).all()
+    # assert np.all(images_train[0, sample_uvs[:,1], sample_uvs[:,0]] == pixels[uvs_start:uvs_end])
+    data = {"rays_o": rays_o, "rays_d": rays_d}
+    # points = sample_along_rays(data["rays_o"], data["rays_d"], random=True)
+    points = sample_along_rays(ray_color_tensors, near=2.0, far=6.0, samples=32, perturb=True)
+    H, W = images_train.shape[1:3]
+    K = intrinsic_K(focal, H, W)
+    # ---------------------------------------
+
+    server = viser.ViserServer(share=True)
+    for i, (image, c2w) in enumerate(zip(images_train, c2ws_train)):
+        server.add_camera_frustum(
+            f"/cameras/{i}",
+            fov=2 * np.arctan2(H / 2, K[0, 0]),
+            aspect=W / H,
+            scale=0.15,
+            wxyz=viser.transforms.SO3.from_matrix(c2w[:3, :3]).wxyz,
+            position=c2w[:3, 3],
+            image=image
+        )
+    for i, (o, d) in enumerate(zip(data["rays_o"], data["rays_d"])):
+        positions = np.stack((o, o + d * 6.0))
+        server.add_spline_catmull_rom(
+            f"/rays/{i}", positions=positions,
+        )
+    server.add_point_cloud(
+        f"/samples",
+        colors=np.zeros_like(points).reshape(-1, 3),
+        points=points.reshape(-1, 3),
+        point_size=0.03,
+    )
+    time.sleep(1000)  
+def calibrate_volume():
+    torch.manual_seed(42)
+    sigmas = torch.rand((10, 64, 1))
+    rgbs = torch.rand((10, 64, 3))
+    step_size = (6.0 - 2.0) / 64
+    rendered_colors = volume_rendering(sigmas, rgbs, step_size)
+
+    correct = torch.tensor([
+        [0.5006, 0.3728, 0.4728],
+        [0.4322, 0.3559, 0.4134],
+        [0.4027, 0.4394, 0.4610],
+        [0.4514, 0.3829, 0.4196],
+        [0.4002, 0.4599, 0.4103],
+        [0.4471, 0.4044, 0.4069],
+        [0.4285, 0.4072, 0.3777],
+        [0.4152, 0.4190, 0.4361],
+        [0.4051, 0.3651, 0.3969],
+        [0.3253, 0.3587, 0.4215]
+    ])
+    assert torch.allclose(rendered_colors, correct, rtol=1e-4, atol=1e-4)
+def part_2():
+    data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
+    data = np.load(osp.join(data_dir, "lego_200x200.npz"))
+
+    # Training images: [100, 200, 200, 3]
+    images_train = data["images_train"] / 255.0
+
+    # Cameras for the training images 
+    # (camera-to-world transformation matrix): [100, 4, 4]
+    c2ws_train = data["c2ws_train"]
+
+    # Validation images: 
+    images_val = data["images_val"] / 255.0
+
+    # Cameras for the validation images: [10, 4, 4]
+    # (camera-to-world transformation matrix): [10, 200, 200, 3]
+    c2ws_val = data["c2ws_val"]
+
+    # Test cameras for novel-view video rendering: 
+    # (camera-to-world transformation matrix): [60, 4, 4]
+    c2ws_test = data["c2ws_test"]
+
+    # Camera focal length
+    focal = data["focal"]  # float
+    
+    ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
+    # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
+    EPOCH = 1000
+    LAYERS = 8
+    LEARNING_RATE = 5e-4
+    mp.set_start_method('spawn')
+    nerf = DeepNeRF(learning_rate=LEARNING_RATE)
+    # dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    dataset = NerfDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    dataloader = DataLoader(dataset, batch_size=1, shuffle=False)
+    psnr = 0.0
+    for i in tqdm(range(EPOCH), "Training iteration:"):
+        for batch in tqdm(dataloader, "Going through batch"):
+            # rays_o = batch[:, 1:, 0].numpy()
+            # rays_d = batch[:, 1:, 1].numpy()
+            actual_colors = batch[:, 1:, 2].float()
+            points = sample_along_rays(batch, near=2.0, far=6.0, samples=64, perturb=True, with_rays=True)
+            coords = torch.from_numpy(points[:, :3]).float()
+            ray_ds = torch.from_numpy(points[:, 3:]).float()
+            nerf.train(coords, ray_ds, actual_colors)
+            psnr += nerf.get_psnrs()[-1]
+        print(f"psnr final {i}: {psnr}")
+        psnr = 0.0
+
+            
+    # calibrate_part1()
+    # calibrate_part2()
+    # calibrate_volume()
+    nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", f"deep_nerf_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.pth"))
+    #metrics
+    train_psnrs = nerf.get_psnrs()[:]
+    nerf.psnrs = []
+    # pred = test(img1, nerf)
+    psnrs = nerf.get_psnrs()
+    # plt.imshow(img1)
+    # plt.show()
+    
+    plt.suptitle(f"PNSRS and Image test w/ num_layers: {LAYERS}, " \
+            + f"learning rate: {LEARNING_RATE}, epochs: {EPOCH}")
+    plt.plot(range(len(train_psnrs)), train_psnrs)
+    plt.title("PNSRS over train iterations")
+    img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
+    psnr_plot = osp.join(img_folder, "deep.png")
+    plt.savefig(psnr_plot)
+    
+   
     
     
     

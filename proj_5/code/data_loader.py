@@ -107,7 +107,7 @@ def worker_camera_pixels_to_rays(pixel_pairs: torch.Tensor, shared_tensor: torch
 class NerfDataSet(Dataset):
     def __init__(self, data: np.array, num_samples: int, 
                  num_workers: int, f: float, c2w: np.array, 
-                 im_height  = None, im_width = None):
+                 im_height  = None, im_width = None, shuffle = False):
         self.workers = min(multiprocessing.cpu_count(), num_workers)
         self.num_samples = num_samples
         self.camera_pixel_pairs = None
@@ -119,9 +119,13 @@ class NerfDataSet(Dataset):
         self.ray_color_pairs = None
         if im_height is not None and im_width is not None:
             self.K = intrinsic_K(f, im_height, im_width)
+            
         #make pixel camera pairs
         for i in tqdm(range(data.shape[0]), "Adding camera pixel pairs: "):
             self.add_flattened_data(data, i)
+            
+            
+        # self.camera_pixel_pairs = self.normalize_coords(self.camera_pixel_pairs)
         self.camera_pixel_pairs = torch.from_numpy(self.camera_pixel_pairs)
         torch.set_num_threads(1)
         self.camera_pixel_pairs.share_memory_()
@@ -142,7 +146,12 @@ class NerfDataSet(Dataset):
         
         shuffle_indices = torch.randperm(result_tensor.size(0))
         self.ray_color_pairs: torch.Tensor = result_tensor[shuffle_indices, :, :]
+        # r0_max = self.ray_color_pairs[:, 1:, 0].max()
+        # rd_max = self.ray_color_pairs[:, 1:, 1].max()
+        # norm_divisor = 
         del self.camera_pixel_pairs
+        if shuffle:
+            self.shuffle()
         #make rays from these pairs
         # split pairs into chunks
         # multi process and turn into rays
@@ -151,7 +160,11 @@ class NerfDataSet(Dataset):
         # clone = self.camera_pixel_pairs.clone()
         
         return
-        
+    def shuffle(self):
+        indices = torch.randperm(self.ray_color_pairs.shape[0])
+        self.ray_color_pairs = self.ray_color_pairs[indices]
+    def normalize_coords(self, coords: np.array) -> np.array:
+        return coords / np.array([self.width - 1, self.height - 1]) 
     def camera_pixel_to_ray(self, pixel_pair: np.array):
             """Turns a uv pixel to r0 and rd rays in form
             [[cam_num, cam_num, cam_num]
@@ -191,16 +204,21 @@ class NerfDataSet(Dataset):
         else:
             self.camera_pixel_pairs = np.vstack((self.camera_pixel_pairs, coords))
         return
+    def get_rays_by_idx(self, indices):
+        return self.ray_color_pairs[indices]
     def sample_rays(self, size: int):
         end = min(self.ray_color_pairs.size(0), size)
         return self.ray_color_pairs[:end]
     def __len__(self):
-        return self.ray_color_pairs.size(0) // self.num_samples if self.ray_color_pairs is not None else 0
+        return (self.ray_color_pairs.size(0) // self.num_samples) - \
+            1 + (1 if (self.ray_color_pairs.size(0) % self.num_samples) > 0 \
+                else 0) \
+                    if self.ray_color_pairs is not None else 0
     
     def __getitem__(self, idx):
         if self.ray_color_pairs is None:
             return None
-        end = min(len(self.ray_color_pairs), (idx + 1) * self.num_samples)
+        end = min(self.ray_color_pairs.size(0), (idx + 1) * self.num_samples)
         sample = self.ray_color_pairs[idx * self.num_samples: end]
         #TODO: figure out how to grab sample with rays AND color for each pixel while having a good batch load
         return sample
@@ -250,7 +268,7 @@ class NerfSingularDataSet(Dataset):
             c2w_mat = self.c2w[cam_num]
             r0, rd = pixel_to_ray(K, c2w_mat, uv)
             ray_color_pair = torch.vstack([r0, rd, clr]).T
-            ray_color_pair = torch.vstack([torch.ones(1, ray_color_pair.size(1)), ray_color_pair])
+            ray_color_pair = torch.vstack([cam_num * torch.ones(1, ray_color_pair.size(1)), ray_color_pair])
             #[[cam_num, cam_num, cam_num]
             #[r0, rd, rgb]
             #[r0, rd, rgb]
@@ -289,7 +307,92 @@ class NerfSingularDataSet(Dataset):
         sample = ray_pixel_pair_tensor
         #TODO: figure out how to grab sample with rays AND color for each pixel while having a good batch load
         return sample
+class NerfTestSingularDataSet(Dataset):
+    def __init__(self, num_samples: int, 
+                 num_workers: int, f: float, c2w: np.array, 
+                 im_height  = None, im_width = None):
+        self.num_samples = num_samples
+        self.camera_pixel_pairs = None
+        self.num_workers = num_workers
+        self.c2w = torch.from_numpy(c2w)
+        self.f = f
+        self.K = None
+        self.ray_color_pairs = []
+        self.im_height = im_height
+        self.im_width = im_width
+        if im_height is not None and im_width is not None:
+            self.K = intrinsic_K(f, im_height, im_width)
+        #make pixel camera pairs
+        for i in tqdm(range(c2w.shape[0]), "Adding camera pixel pairs: "):
+            self.add_flattened_data(i)
+        self.camera_pixel_pairs = torch.from_numpy(self.camera_pixel_pairs)
+        #make rays from these pairs
+        # split pairs into chunks
+        # multi process and turn into rays
+        
+        # chunks = torch.chunk(self.camera_pixel_pairs, multiprocessing.cpu_count())
+        # clone = self.camera_pixel_pairs.clone()
+        
+        return
+        
+    def camera_pixel_to_ray(self, pixel_pair: np.array):
+            """Turns a uv pixel to r0 and rd rays in form
+            [[cam_num, cam_num]
+             [r0, rd]]"""
+            #pixel_pair form : (cam_num, x, y)
+            cam_num = pixel_pair[0].int().item()
+            uv = pixel_pair[1:]
+            # pixel_coord = (uv - 0.5).int().numpy()
+            # clr = torch.tensor(clr) # (x, y) -> (r, c)
+            K = None
+            if self.K is None:
+                img = self.data[cam_num]
+                K = intrinsic_K(self.f, img.shape[0], img.shape[1])
+            else:
+                K = self.K
+            c2w_mat = self.c2w[cam_num]
+            r0, rd = pixel_to_ray(K, c2w_mat, uv)
+            uv = np.append(uv, 1)
+            uv = torch.from_numpy(uv)
+            ray_color_pair = torch.vstack([r0, rd, uv]).T
+            ray_color_pair = torch.vstack([cam_num * torch.ones(1, ray_color_pair.size(1)), ray_color_pair])
+            #[[cam_num, cam_num, cam_num]
+            #[[r0,      rd,   uv]
+            # [r0,      rd,   uv]
+            # [r0,      rd,   1]]
+            return ray_color_pair   
+    def add_flattened_data(self, camera: int):
+        # image = data[camera]
+        coords = np.indices((self.im_height, self.im_width)).reshape(2, -1).T #(r, c) form
+        coords = coords[:, ::-1] + 0.5 #(r, c) -> (x, y) or (u, v) format
+        cam_num = np.zeros((coords.shape[0], 1))
+        cam_num += camera
+        coords = np.hstack((cam_num, coords))
+        if self.camera_pixel_pairs is None:
+            self.camera_pixel_pairs = coords
+        else:
+            self.camera_pixel_pairs = np.vstack((self.camera_pixel_pairs, coords))
+        return
+    def sample_rays(self, size: int):
+        assert self.camera_pixel_pairs is not None
+        randindxs = np.random.randint(0, len(self), size)
+        return self.get_rays_by_idx(randindxs)
+    def get_rays_by_idx(self, indices):
+        res = []
+        for idx in indices:
+            res.append(self[idx])
+        return torch.stack(res, dim=0)
+    def __len__(self):
+        return self.camera_pixel_pairs.shape[0] if self.camera_pixel_pairs is not None else 0
     
+    def __getitem__(self, idx):
+        if self.camera_pixel_pairs is None:
+            return None
+        pair = self.camera_pixel_pairs[idx]
+        ray_pixel_pair_tensor = self.camera_pixel_to_ray(pair)
+        sample = ray_pixel_pair_tensor
+        #TODO: figure out how to grab sample with rays AND color for each pixel while having a good batch load
+        return sample 
 class ImageDataLoader(object):
     def __init__(self, sample_size: int = 10):
         self.sample_size = sample_size

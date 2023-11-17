@@ -85,8 +85,8 @@ def worker(ray_pairs, near: float, far: float, samples: int = 32, perturb=False,
     r0_expanded = r0s.repeat(samples, 1)
     reshaped_t_set = t_set.repeat_interleave(ray_pairs.size(0))
 
-    # Calculate points
-    points = r0_expanded + rd_expanded * reshaped_t_set.unsqueeze(-1)  # Shape will be [num_rays, num sampl, 3]
+    # Calculate points: Shape will be [num_rays, num sampl, 3]
+    points = r0_expanded + rd_expanded * reshaped_t_set.unsqueeze(-1)
 
     if with_rays:
         
@@ -105,38 +105,52 @@ def sample_along_rays(ray_pairs: torch.Tensor, near: float, far: float, samples:
     # points = []
     # processes = []
     # result_queue = mp.Queue()
-    results = []
-    num_processes = 2
-    assert ray_pairs.size(0) % num_processes == 0
-    torch.set_num_threads(1)
-    ray_pair_chunks = ray_pairs.view(num_processes, ray_pairs.size(0) // num_processes, 4, 3)
-    ray_pair_chunks.share_memory_()
-    with multiprocessing.Pool(num_processes) as pool:
-        all_args = [(ray_pair_chunks[i], near, far, samples, perturb, with_rays) for i in range(num_processes)]
-        results = pool.starmap(worker, all_args)
-    # results = worker(ray_pairs, near, far, samples, perturb, with_rays)
-    return np.vstack(results)
-    # return np.array(results)
-    # for i in tqdm(range(num_processes), "making sub process: "):
-    #     p = mp.Process(target=worker, args=(i, ray_pair_chunks, near, far, result_queue, samples, perturb, with_rays))
-    #     p.start()
-    #     processes.append(p)
-        
-    # for p in tqdm(processes, "joining sub processes..."):
-    #     p.join()
+    #multiprocess
     # results = []
-    # while not result_queue.empty():
-    #     item = result_queue.get()
-    #     if isinstance(item, Exception):
-    #         raise item  # Re-raise exception from the subprocess
-    #     results.append(item)
+    # num_processes = 2
+    # assert ray_pairs.size(0) % num_processes == 0
+    # torch.set_num_threads(1)
+    # ray_pair_chunks = torch.chunk(ray_pairs, num_processes)
+    # # ray_pair_chunks.share_memory_()
+    # with multiprocessing.Pool(num_processes) as pool:
+    #     for i in range(num_processes):
+    #         ray_pair_chunks[i].share_memory_()
+    #     all_args = [(ray_pair_chunks[i], near, far, samples, perturb, with_rays) for i in range(num_processes)]
+    #     results = pool.starmap(worker, all_args)
     # return np.vstack(results)
+    #singular process
+    results = worker(ray_pairs, near, far, samples, perturb, with_rays)
+    return results
+    # return np.array(results)
+def sample_along_rays_keep_batch(ray_pairs: torch.Tensor, near: float, far: float, samples: int = 32, perturb=False, with_rays=False):
+    points = []
     # for i in tqdm(range(ray_pairs.size(0)), "Generating points: "):
     #     ray_pair = ray_pairs[i]
     #     r0 = ray_pair[1:, 0]
     #     rd = ray_pair[1:, 1]
     #     points.extend(sample_along_ray(r0, rd, near, far, samples, perturb, with_rays))
     # return np.array(points)
+    t_set = np.linspace(near, far, samples)
+    t_width = 0.1
+    if perturb:
+        t_set += np.random.rand(*t_set.shape) * t_width
+    t_set = torch.from_numpy(t_set).float()
+    # ones = torch.ones_like(t_set)
+    r0s = ray_pairs[:, 1:, 0]
+    rds = ray_pairs[:, 1:, 1]
+    rd_expanded = rds.unsqueeze(1).repeat(1, samples, 1)
+    r0_expanded = r0s.unsqueeze(1).repeat(1, samples, 1)
+    reshaped_t_set = t_set.unsqueeze(0).unsqueeze(-1).repeat(ray_pairs.shape[0], 1, 1)
+
+    # Calculate points: Shape will be [num_rays, num sampl, 3]
+    points = r0_expanded + rd_expanded * reshaped_t_set
+
+    if with_rays:
+        
+        # rds_expanded = rds.unsqueeze(1).expand(-1, samples, -1)
+        points = torch.cat([points, rd_expanded], dim=-1) 
+
+    return points.numpy() 
 
     
 def volume_rendering(sigmas, rgbs, step_size):

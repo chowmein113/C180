@@ -7,11 +7,15 @@ from torch.utils.data import DataLoader
 import numpy as np
 import matplotlib.pyplot as plt
 import torch
-from data_loader import ImageDataSet, NerfDataSet, NerfSingularDataSet
+from data_loader import ImageDataSet, NerfDataSet, NerfSingularDataSet, NerfTestSingularDataSet
 import skimage.io as skio
 from tools import *
+
+##GLOBALS
 PART_1 = False
 PART_2 = True
+PART_3 = False
+
 def load_img(path: str) -> np.array:
     img = skio.imread(path) / 255.0
     return img
@@ -86,6 +90,22 @@ def model_process(data_queue, result_queue, model: NeRF):
             input_parm = data.to(model.device)
             result = model.pred(input_parm)
             result_queue.put(result.cpu()) 
+def deep_test(dataset, nerf):
+    dataloader = DataLoader(dataset, batch_size=(10000 if type(dataset) == NerfSingularDataSet else 1), shuffle=True)
+   
+    for idx, batch in enumerate(tqdm(dataloader, "Testing images: ")):
+        # rays_o = batch[:, 1:, 0].numpy()
+        # rays_d = batch[:, 1:, 1].numpy()
+        if type(dataset) == NerfDataSet:
+            batch = batch[0]
+        actual_colors = batch[:, 1:, 2].float()
+        points = sample_along_rays_keep_batch(batch, near=2.0, far=6.0, samples=64, perturb=True, with_rays=True)
+        coords = torch.from_numpy(points).float()
+        ray_ds = batch[:, 1:, 1].float()
+        nerf.test(coords, ray_ds, actual_colors)
+        psnr = nerf.get_psnrs()[-1]
+        if idx % 20 == 0:
+            print(f"psnr current {idx}: {psnr}") 
     
 def part_1():
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
@@ -169,7 +189,7 @@ def calibrate_part1():
     LAYERS = 4
     LEARNING_RATE = 1e-3
     nerf = NeRF(layers=LAYERS, learning_rate=LEARNING_RATE)
-    dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    dataset = NerfDataSet(data=images_train, num_samples=10000, num_workers = multiprocessing.cpu_count(), f = focal, c2w = c2ws_train, im_height=200, im_width=200)
     # dataloader = nerf.get_img_data_loader().add_dataset(dataset)
     import viser, time  # pip install viser
     # import numpy as np
@@ -268,15 +288,15 @@ def calibrate_part2():
     uvs_start = 0
     uvs_end = 40_000
     assert dataset.camera_pixel_pairs is not None
-    # sample_uvs = np.round((dataset.camera_pixel_pairs[uvs_start:uvs_end, 1:3] - 0.5).numpy()).astype(int) # These are integer coordinates of widths / heights (xy not yx) of all the pixels in an image
+    sample_uvs = np.round((dataset.camera_pixel_pairs[uvs_start:uvs_end, 1:3] - 0.5).numpy()).astype(int) # These are integer coordinates of widths / heights (xy not yx) of all the pixels in an image
     # uvs are array of xy coordinates, so we need to index into the 0th image tensor with [0, height, width], so we need to index with uv[:,1] and then uv[:,0]
-    # pixels = dataset.camera_pixel_pairs[uvs_start:uvs_end, 3:]
-    # for i, sample_uv in enumerate(sample_uvs):
-    #     img = images_train[0]
-    #     gen_pixel = img[sample_uv[1], sample_uv[0]]
-    #     gen_pixel = images_train[0, sample_uv[1], sample_uv[0]]
-    #     pixel = pixels[i]
-    #     assert np.isclose(gen_pixel, pixel).all()
+    pixels = dataset.camera_pixel_pairs[uvs_start:uvs_end, 3:]
+    for i, sample_uv in enumerate(sample_uvs):
+        img = images_train[0]
+        gen_pixel = img[sample_uv[1], sample_uv[0]]
+        gen_pixel = images_train[0, sample_uv[1], sample_uv[0]]
+        pixel = pixels[i]
+        assert np.isclose(gen_pixel, pixel, atol=0.001).all()
     # assert np.all(images_train[0, sample_uvs[:,1], sample_uvs[:,0]] == pixels[uvs_start:uvs_end])
     data = {"rays_o": rays_o, "rays_d": rays_d}
     # points = sample_along_rays(data["rays_o"], data["rays_d"], random=True)
@@ -329,6 +349,9 @@ def calibrate_volume():
     ])
     assert torch.allclose(rendered_colors, correct, rtol=1e-4, atol=1e-4)
 def part_2():
+    # calibrate_part1()
+    # calibrate_part2()
+    # calibrate_volume()
     data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
     data = np.load(osp.join(data_dir, "lego_200x200.npz"))
 
@@ -355,26 +378,44 @@ def part_2():
     
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "nerf_complete.pth"))
     # nerf = NeRF(layers=6, learning_rate=1e-3, pth = ckpt)
-    EPOCH = 10
+    EPOCH = 100
     LAYERS = 8
     LEARNING_RATE = 5e-4
+    SAMPLES = 32
     mp.set_start_method('spawn')
-    nerf = DeepNeRF(learning_rate=LEARNING_RATE)
-    # dataset = NerfSingularDataSet(data=images_train, num_samples=1000, num_workers = 4, f = focal, c2w = c2ws_train, im_height=200, im_width=200)
+    nerf = DeepNeRF(learning_rate=LEARNING_RATE, pixel_depth=32)
+    # dataset = NerfSingularDataSet(data=images_train[:10], num_samples=10000, num_workers = multiprocessing.cpu_count(), f = focal, c2w = c2ws_train[:10], im_height=200, im_width=200)
     dataset = NerfDataSet(data=images_train, num_samples=10000, num_workers = multiprocessing.cpu_count(), f = focal, c2w = c2ws_train, im_height=200, im_width=200)
-    dataloader = DataLoader(dataset, batch_size=1, shuffle=True)
+    # dataloader = DataLoader(dataset, batch_size=(10000 if type(dataset) == NerfSingularDataSet else 1), shuffle=(type(dataset) == NerfSingularDataSet))
+    dataloader = dataset
     psnr = 0.0
+    use_dataloader = False
     for i in tqdm(range(EPOCH), "Training iteration:"):
+        if type(dataset) == NerfDataSet:
+            dataset.shuffle()
         for idx, batch in enumerate(tqdm(dataloader, "Going through batch")):
-            # rays_o = batch[:, 1:, 0].numpy()
-            # rays_d = batch[:, 1:, 1].numpy()
-            batch = batch[0]
-            actual_colors = batch[:, 1:, 2].float()
-            points = sample_along_rays(batch, near=2.0, far=6.0, samples=64, perturb=True, with_rays=True)
-            coords = torch.from_numpy(points[:, :3]).float()
-            ray_ds = torch.from_numpy(points[:, 3:]).float()
-            nerf.train(coords, ray_ds, actual_colors)
-            psnr += nerf.get_psnrs()[-1]
+            try:
+                # rays_o = batch[:, 1:, 0].numpy()
+                # rays_d = batch[:, 1:, 1].numpy()
+                if batch.shape[0] == 0:
+                    print("bad batch call")
+                    break
+                if type(dataset) == NerfDataSet and use_dataloader:
+                    batch = batch[0]
+                actual_colors = batch[:, 1:, 2].float()
+                points = sample_along_rays_keep_batch(batch, near=2.0, far=6.0, samples=SAMPLES, perturb=True)
+                coords = torch.from_numpy(points).float()
+                ray_ds = batch[:, 1:, 1].float()
+                m1 = coords.max()
+                m2 = ray_ds.max()
+                nerf.train(coords, ray_ds, actual_colors)
+                psnr = nerf.get_psnrs()[-1]
+            except Exception as e:
+                print(f"Error: {e}")
+                nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), 
+                                         "checkpoints", 
+                                         f"deep_nerf_singular_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}_samples_{SAMPLES}.pth"))
+                continue
             if idx % 20 == 0:
                print(f"psnr current {idx}: {psnr}") 
         print(f"psnr final {i}: {psnr}")
@@ -384,23 +425,82 @@ def part_2():
     # calibrate_part1()
     # calibrate_part2()
     # calibrate_volume()
-    nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", f"deep_nerf_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}.pth"))
+    nerf.save_model(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", 
+                             f"deep_nerf_singular_epoch{EPOCH}_LR{LEARNING_RATE}_LAYER{LAYERS}_samples_{SAMPLES}.pth"))
     #metrics
     train_psnrs = nerf.get_psnrs()
     nerf.psnrs = []
-    # pred = test(img1, nerf)
+    dataset = NerfDataSet(data=images_val, num_samples=10000, num_workers = multiprocessing.cpu_count(), f = focal, c2w = c2ws_val, im_height=200, im_width=200)
+    deep_test(dataset, nerf)
     psnrs = nerf.get_psnrs()
     # plt.imshow(img1)
     # plt.show()
-    
-    plt.suptitle(f"PNSRS and Image test w/ num_layers: {LAYERS}, " \
+    f, axs = plt.subplots(1, 2, figsize=(10, 10))
+    f.suptitle(f"PNSRS and Image test w/ num_layers: {LAYERS}, " \
             + f"learning rate: {LEARNING_RATE}, epochs: {EPOCH}")
-    plt.plot(range(len(train_psnrs)), train_psnrs)
-    plt.title("PNSRS over train iterations")
+    axs[0].plot(range(len(train_psnrs)), train_psnrs)
+    axs[0].title("PNSRS over train iterations")
+    axs[1].plot(range(len(psnrs)), psnrs)
+    axs[1].set_title("PSNRS on validation set")
     img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
-    psnr_plot = osp.join(img_folder, "deep.png")
+    psnr_plot = osp.join(img_folder, "deep_with_validation.png")
     plt.savefig(psnr_plot)
+def part_3():
+    data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
+    data = np.load(osp.join(data_dir, "lego_200x200.npz"))
+
+    # Training images: [100, 200, 200, 3]
+    images_train = data["images_train"] / 255.0
+
+    # Cameras for the training images 
+    # (camera-to-world transformation matrix): [100, 4, 4]
+    c2ws_train = data["c2ws_train"]
+
+    # Validation images: 
+    images_val = data["images_val"] / 255.0
+
+    # Cameras for the validation images: [10, 4, 4]
+    # (camera-to-world transformation matrix): [10, 200, 200, 3]
+    c2ws_val = data["c2ws_val"]
+
+    # Test cameras for novel-view video rendering: 
+    # (camera-to-world transformation matrix): [60, 4, 4]
+    c2ws_test = data["c2ws_test"]
+
+    # Camera focal length
+    focal = data["focal"]  # float
     
+    ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), "checkpoints", "deep_nerf_epoch10_LR0.0005_LAYER8.pth"))    
+    nerf = DeepNeRF(pth=ckpt)
+    
+    #for single image
+    img_c2w = np.array([c2ws_test[0]])
+    im_height, im_width = images_train.shape[1:3]
+    coords = np.indices((im_height, im_width)).reshape(2, -1).T
+    #get coords in N x 2 in (r, c) format
+    coords = coords[:, ::-1] # (r, c) -> x, y form for uv
+    dataset = NerfTestSingularDataSet(num_samples=10000, 
+                                      num_workers=multiprocessing.cpu_count(), 
+                                      f=focal, c2w = img_c2w, im_height=im_height,
+                                      im_width=im_width)
+    dataloader = DataLoader(dataset, batch_size=10000, shuffle=False)
+    canvas = np.zeros((images_train.shape[1:]))
+    for batch in tqdm(dataloader, "Generating Image Cloud"):
+        # rays_o = batch[:, 1:, 0].numpy()
+        # rays_d = batch[:, 1:, 1].numpy()
+        if type(dataset) == NerfDataSet:
+            batch = batch[0]
+        pixel_coords = np.round((batch[:, 1:3, 2] - 0.5).numpy()).astype(int) #u, v to x, y
+        points = sample_along_rays(batch, near=2.0, far=6.0, samples=64, perturb=False, with_rays=True)
+        coords = torch.from_numpy(points[:, :3]).float()
+        ray_ds = torch.from_numpy(points[:, 3:]).float()
+        colors = nerf.pred(coords, ray_ds)
+        canvas[pixel_coords[:, 1], pixel_coords[:, 0]]  = colors.cpu()#x, y to r, c
+    plt.imshow((canvas * 255).astype(np.uint8))
+    plt.title("Regenerated Image from deep Nerf")
+    img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
+    plot = osp.join(img_folder, "deep_test_gen.png")
+    plt.savefig(plot)
    
     
     
@@ -412,6 +512,8 @@ def main():
         part_1()
     if PART_2:
         part_2()
+    if PART_3:
+        part_3()
     
     
 if __name__ == "__main__":

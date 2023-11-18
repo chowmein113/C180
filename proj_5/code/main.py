@@ -13,8 +13,8 @@ from tools import *
 
 ##GLOBALS
 PART_1 = False
-PART_2 = True
-PART_3 = False
+PART_2 = False
+PART_3 = True
 
 def load_img(path: str) -> np.array:
     img = skio.imread(path) / 255.0
@@ -494,13 +494,13 @@ def part_3():
     
     nerf = DeepNeRF(learning_rate=LEARNING_RATE, pth=ckpt, pixel_depth=SAMPLES)
     im_height, im_width = images_val.shape[1:3]
-    dataset = NerfDataSet(images_val, num_workers=multiprocessing.cpu_count(), num_samples=10000, 
-                          f = focal, c2w=c2ws_val, 
-                          im_height=im_height, im_width=im_width)
-    deep_test(dataset, nerf)
-    plt.plot(range(len(nerf.get_psnrs())), nerf.get_psnrs())
-    plt.title(f"Test validation set for {model_pth}")
-    plt.savefig(osp.join(img_folder, "test_nerf.png"))
+    # dataset = NerfDataSet(images_val, num_workers=multiprocessing.cpu_count(), num_samples=10000, 
+    #                       f = focal, c2w=c2ws_val, 
+    #                       im_height=im_height, im_width=im_width)
+    # deep_test(dataset, nerf)
+    # plt.plot(range(len(nerf.get_psnrs())), nerf.get_psnrs())
+    # plt.title(f"Test validation set for {model_pth}")
+    # plt.savefig(osp.join(img_folder, "test_nerf.png"))
     #for single image
     img_c2w = np.array([c2ws_test[0]])
     im_height, im_width = images_train.shape[1:3]
@@ -519,9 +519,9 @@ def part_3():
         if type(dataset) == NerfDataSet:
             batch = batch[0]
         pixel_coords = np.round((batch[:, 1:3, 2] - 0.5).numpy()).astype(int) #u, v to x, y
-        points = sample_along_rays(batch, near=2.0, far=6.0, samples=64, perturb=False, with_rays=True)
-        coords = torch.from_numpy(points[:, :3]).float()
-        ray_ds = torch.from_numpy(points[:, 3:]).float()
+        points = sample_along_rays_keep_batch(batch, near=2.0, far=6.0, samples=32, perturb=False, with_rays=False)
+        coords = torch.from_numpy(points).float()
+        ray_ds = batch[:, 1:, 1].float()
         colors = nerf.pred(coords, ray_ds)
         canvas[pixel_coords[:, 1], pixel_coords[:, 0]]  = colors.cpu()#x, y to r, c
     plt.imshow((canvas * 255).astype(np.uint8))

@@ -65,14 +65,9 @@ def separate_ray_pairs(ray_pairs: torch.Tensor):
         cam_num = ray_pair[0, 0].item()
         lst.append((cam_num, r0, rd, pixel))
 def worker(ray_pairs, near: float, far: float, samples: int = 32, perturb=False, with_rays=False):
-    # ray_pairs = ray_pair_chunks[i]
+    
     points = []
-    # for i in tqdm(range(ray_pairs.size(0)), "Generating points: "):
-    #     ray_pair = ray_pairs[i]
-    #     r0 = ray_pair[1:, 0]
-    #     rd = ray_pair[1:, 1]
-    #     points.extend(sample_along_ray(r0, rd, near, far, samples, perturb, with_rays))
-    # return np.array(points)
+   
     t_set = np.linspace(near, far, samples)
     t_width = 0.1
     if perturb:
@@ -102,34 +97,13 @@ def sample_along_rays(ray_pairs: torch.Tensor, near: float, far: float, samples:
     #[r0,         rd,      rgb]
     #[r0,         rd,      rgb]
     #[r0,         rd,      rgb]]
-    # points = []
-    # processes = []
-    # result_queue = mp.Queue()
-    #multiprocess
-    # results = []
-    # num_processes = 2
-    # assert ray_pairs.size(0) % num_processes == 0
-    # torch.set_num_threads(1)
-    # ray_pair_chunks = torch.chunk(ray_pairs, num_processes)
-    # # ray_pair_chunks.share_memory_()
-    # with multiprocessing.Pool(num_processes) as pool:
-    #     for i in range(num_processes):
-    #         ray_pair_chunks[i].share_memory_()
-    #     all_args = [(ray_pair_chunks[i], near, far, samples, perturb, with_rays) for i in range(num_processes)]
-    #     results = pool.starmap(worker, all_args)
-    # return np.vstack(results)
-    #singular process
+    
     results = worker(ray_pairs, near, far, samples, perturb, with_rays)
     return results
     # return np.array(results)
 def sample_along_rays_keep_batch(ray_pairs: torch.Tensor, near: float, far: float, samples: int = 32, perturb=False, with_rays=False):
     points = []
-    # for i in tqdm(range(ray_pairs.size(0)), "Generating points: "):
-    #     ray_pair = ray_pairs[i]
-    #     r0 = ray_pair[1:, 0]
-    #     rd = ray_pair[1:, 1]
-    #     points.extend(sample_along_ray(r0, rd, near, far, samples, perturb, with_rays))
-    # return np.array(points)
+  
     t_set = np.linspace(near, far, samples)
     t_width = 0.1
     if perturb:

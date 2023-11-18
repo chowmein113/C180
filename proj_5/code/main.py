@@ -504,7 +504,7 @@ def part_3():
     # plt.title(f"Test validation set for {model_pth}")
     # plt.savefig(osp.join(img_folder, "test_nerf.png"))
     #for single image
-    for i in range(c2ws_test.shape[0]):
+    for i in tqdm(range(c2ws_test.shape[0]), "Generating Novel Images"):
         img_c2w = np.array([c2ws_test[i]])
         im_height, im_width = images_train.shape[1:3]
         coords = np.indices((im_height, im_width)).reshape(2, -1).T

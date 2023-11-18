@@ -457,6 +457,8 @@ def part_2():
     img_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
     psnr_plot = osp.join(img_folder, "deep_with_validation.png")
     plt.savefig(psnr_plot)
+    
+    
 def part_3():
     data_dir = osp.join(osp.abspath(osp.dirname(__file__)), "data")
     data = np.load(osp.join(data_dir, "lego_200x200.npz"))

@@ -483,7 +483,7 @@ def part_3():
 
     # Camera focal length
     focal = data["focal"]  # float
-    model_pth = "deep_nerf_singular_epoch100_LR0.0005_LAYER8_samples_32.pth"
+    model_pth = "deep_nerf_singular_epoch1500_LR0.0005_LAYER8_samples_32.pth"
     ckpt = osp.join(osp.join(osp.abspath(osp.dirname(__file__)), 
                              "checkpoints", 
                              model_pth))    
@@ -504,33 +504,33 @@ def part_3():
     # plt.title(f"Test validation set for {model_pth}")
     # plt.savefig(osp.join(img_folder, "test_nerf.png"))
     #for single image
-    img_c2w = np.array([c2ws_test[0]])
-    im_height, im_width = images_train.shape[1:3]
-    coords = np.indices((im_height, im_width)).reshape(2, -1).T
-    #get coords in N x 2 in (r, c) format
-    coords = coords[:, ::-1] # (r, c) -> x, y form for uv
-    dataset = NerfTestSingularDataSet(num_samples=10000, 
-                                      num_workers=multiprocessing.cpu_count(), 
-                                      f=focal, c2w = img_c2w, im_height=im_height,
-                                      im_width=im_width)
-    dataloader = DataLoader(dataset, batch_size=10000, shuffle=False)
-    canvas = np.zeros((images_train.shape[1:]))
-    for batch in tqdm(dataloader, "Generating Image Cloud"):
-        # rays_o = batch[:, 1:, 0].numpy()
-        # rays_d = batch[:, 1:, 1].numpy()
-        if type(dataset) == NerfDataSet:
-            batch = batch[0]
-        pixel_coords = np.round((batch[:, 1:3, 2] - 0.5).numpy()).astype(int) #u, v to x, y
-        points = sample_along_rays_keep_batch(batch, near=2.0, far=6.0, samples=32, perturb=False, with_rays=False)
-        coords = torch.from_numpy(points).float()
-        ray_ds = batch[:, 1:, 1].float()
-        colors = nerf.pred(coords, ray_ds)
-        canvas[pixel_coords[:, 1], pixel_coords[:, 0]]  = colors.cpu()#x, y to r, c
-    plt.imshow((canvas * 255).astype(np.uint8))
-    plt.title("Regenerated Image from deep Nerf")
-    
-    plot = osp.join(img_folder, "deep_test_gen.png")
-    plt.savefig(plot)
+    for i in range(c2ws_test.shape[0]):
+        img_c2w = np.array([c2ws_test[i]])
+        im_height, im_width = images_train.shape[1:3]
+        coords = np.indices((im_height, im_width)).reshape(2, -1).T
+        #get coords in N x 2 in (r, c) format
+        coords = coords[:, ::-1] # (r, c) -> x, y form for uv
+        dataset = NerfTestSingularDataSet(num_samples=10000, 
+                                        num_workers=multiprocessing.cpu_count(), 
+                                        f=focal, c2w = img_c2w, im_height=im_height,
+                                        im_width=im_width)
+        dataloader = DataLoader(dataset, batch_size=10000, shuffle=False)
+        canvas = np.zeros((images_train.shape[1:]))
+        for batch in tqdm(dataloader, "Generating Image Cloud"):
+            # rays_o = batch[:, 1:, 0].numpy()
+            # rays_d = batch[:, 1:, 1].numpy()
+            if type(dataset) == NerfDataSet:
+                batch = batch[0]
+            pixel_coords = np.round((batch[:, 1:3, 2] - 0.5).numpy()).astype(int) #u, v to x, y
+            points = sample_along_rays_keep_batch(batch, near=2.0, far=6.0, samples=32, perturb=False, with_rays=False)
+            coords = torch.from_numpy(points).float()
+            ray_ds = batch[:, 1:, 1].float()
+            colors = nerf.pred(coords, ray_ds)
+            canvas[pixel_coords[:, 1], pixel_coords[:, 0]]  = colors.cpu()#x, y to r, c
+        plt.imshow((canvas * 255).astype(np.uint8))
+        plt.title("Regenerated Image from deep Nerf")
+        plot = osp.join(img_folder, f"novel_view_{i}.png")
+        plt.savefig(plot)
    
     
     

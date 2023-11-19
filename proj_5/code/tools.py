@@ -126,7 +126,7 @@ def sample_along_rays_keep_batch(ray_pairs: torch.Tensor, near: float, far: floa
 
     return points.numpy() 
 
-    
+
 def volume_rendering(sigmas, rgbs, step_size):
     # Compute the prob from the density/sigma values
     prob_i = 1.0 - torch.exp(-sigmas * step_size)
@@ -137,3 +137,20 @@ def volume_rendering(sigmas, rgbs, step_size):
     vol = prob_i * T_i
     rendered_colors = torch.sum(vol * rgbs, dim=1)
     return rendered_colors
+def create_the_gif(image_folder, gif_name, duration):
+    images = []
+    for i in range(60):
+        
+        file_path = osp.join(image_folder, f"novel_view_{i}.png")
+        images.append(imageio.imread(file_path))
+    imageio.mimsave(gif_name, images, duration=duration)
+
+    
+    
+if __name__ == "__main__":
+    import imageio.v2 as imageio
+    import os
+    import os.path as osp
+    image_folder = osp.join(osp.abspath(osp.dirname(osp.dirname(__file__))), "images")
+    create_the_gif(image_folder, osp.join(image_folder, "novel_view.gif"), 0.5)
+
